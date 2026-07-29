@@ -1,0 +1,32 @@
+# Python sanal ortamları
+.venv/
+.venv-py39-old/
+venv/
+
+# Python geçici dosyaları
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ortam değişkenleri ve gizli bilgiler
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+
+# Loglar
+*.log
+
+# Yedek dosyalar
+compose.yaml.bak
+*.bak
+
+# Test ve cache
+.pytest_cache/
+.mypy_cache/
+.coverage
