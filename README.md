@@ -81,6 +81,7 @@ flightdb
 - [x] REST snapshot, WebSocket reconnect ve yeniden eşitleme akışı
 - [x] Nginx frontend image ve aynı-origin backend proxy
 - [x] Nginx üzerinden gerçek OpenSky WebSocket mesajı doğrulaması
+- [x] Global mod için OpenSky kota uyarısı, MongoDB TTL retention ve WebSocket batch altyapısı
 
 ### Şu anda yapılacak
 
@@ -149,7 +150,7 @@ WebSocket geçici, düşük gecikmeli güncelleme kanalıdır; MongoDB ise yenid
 | Yöntem | Yol | Veri kaynağı | Amaç |
 |---|---|---|---|
 | `GET` | `/health` | MongoDB + Kafka durumu | Servis sağlığı |
-| `GET` | `/api/aircraft?limit=200` | `live_positions` | Canlı uçak listesi |
+| `GET` | `/api/aircraft?limit=200` | `live_positions` | Canlı uçak listesi; global harita snapshot'ı için `limit=20000` kullanılabilir |
 | `GET` | `/api/aircraft/{icao24}` | `live_positions` | Tek uçağın son durumu |
 | `GET` | `/api/aircraft/{icao24}/history?limit=100` | `raw_positions` | Uçak geçmişi |
 | `GET` | `/api/stats` | `live_positions` | Temel uçak sayaçları |
@@ -165,54 +166,48 @@ React ve CSS birbirinin alternatifi değildir:
 
 - **React + TypeScript**, REST/WebSocket verisini, bağlantı durumunu, filtreyi ve seçili uçağı yönetir.
 - **CSS**, yerleşimi, renkleri, responsive görünümü ve tablo stilini yönetir.
-- **Leaflet**, harita pan/zoom etkileşimini ve marker katmanını yönetir.
+- **MapLibre GL JS**, global harita, WebGL uçak sembolleri ve düz/küre görünümü yönetir.
+- **Leaflet**, güvenli fallback harita motoru olarak korunur.
 - **Vite**, TypeScript kontrolü ve production build işlemini yapar.
 - **Nginx**, statik frontend dosyalarını sunar; `/api`, `/health` ve `/ws` yollarını FastAPI'ye proxy eder.
 
-Harita MapLibre yerine Leaflet ile çalışır. Bunun nedeni bu aşamada daha sade
-bir event modeliyle güvenilir pan/zoom davranışı almak ve frontend bundle
-boyutunu küçültmektir. Uçaklar React component ağacı içinde tek tek yeniden
-render edilmez; Leaflet marker layer'ı içinde `divIcon` uçak sembolleri olarak
-gösterilir ve uçuş yönüne göre döndürülür. Harita zoom/pan state'i React'e
-taşınmaz; Leaflet kendi içinde yönetir. WebSocket mesajları
+Harita varsayılan olarak MapLibre GL JS ile açılır. Bunun nedeni global modda
+binlerce uçağı DOM marker yerine WebGL symbol layer ile çizerek pan/zoom
+akışını daha stabil tutmaktır. MapLibre düz harita ve küre projection geçişini
+destekler. Leaflet hâlâ kullanıcı arayüzündeki harita motoru toggle'ı ile
+seçilebilen güvenli fallback olarak durur. WebSocket mesajları
 `requestAnimationFrame` ile aynı ekran karesinde toplu uygulanır ve tablo en
-fazla 200 DOM satırı gösterir.
+fazla 300 DOM satırı gösterir.
 
-MapLibre GL JS yeniden kontrollü deney modu olarak eklenmiştir. Leaflet hâlâ
-varsayılan harita motorudur; kullanıcı arayüzündeki harita motoru toggle'ı ile
-MapLibre deney görünümüne geçilebilir. MapLibre component'i lazy-load edilir,
-yani büyük WebGL harita paketi ilk sayfa açılışında yüklenmez. Deney modu
-base map, pan/zoom, düz harita/küre projection geçişi ve canlı uçakları WebGL
-circle layer olarak çizme davranışını doğrular. Uçak sembolleri ve geçmiş rota
-çizimi henüz Leaflet üzerinde çalışır; sonraki adımda MapLibre symbol/line
-layer'larına taşınacaktır.
-
-Uçak renkleri irtifa aralıklarına göre yüksek kontrastlı seçilmiştir ve
-harita üzerinde metre aralıklarını gösteren bir renk efsanesi bulunur. Uçağa
+Uçak renkleri OpenSky benzeri feet tabanlı irtifa skalasına göre seçilmiştir ve
+haritanın altında yatay bir renk efsanesi bulunur. Backend verisi metre olarak
+gelir; frontend renk hesabında metre değerini feet karşılığına çevirir. Uçağa
 tıklandığında frontend `raw_positions` tabanlı history endpoint'inden son
-kayıtları alır ve seçili uçağın geçmiş rotasını harita üzerinde çizer. Rota
-çizgisi kesikli değildir; küçük segmentlere ayrılır ve her segment uçağın o
-noktadaki irtifa aralığına göre renklendirilir.
+kayıtları alır ve seçili uçağın geçmiş rotasını harita üzerinde çizer. MapLibre
+rotayı WebGL `line-gradient` ile yumuşak irtifa renk geçişleri olarak gösterir.
+Uçak bilgi popup'ı MapLibre tarafında 1.5 saniye hover sonrası açılır; rota
+yükleme için tıklama davranışı korunur.
 
-Canlı ekranda yalnızca son 10 dakika içinde gözlenen uçaklar gösterilir.
-`live_positions` hâlâ uçak başına son bilinen durumu saklar; fakat daha eski
-kayıtlar harita ve canlı listeden gizlenir. Bu kayıtlar raw veri değildir,
-yalnızca artık canlı kabul edilmeyen son bilinen konumlardır. Uçak geçmişi
-sorguları `raw_positions` üzerinden yapılmaya devam eder.
+Canlı ekranda yalnızca yapılandırılan canlı görünüm penceresi içinde gözlenen
+uçaklar gösterilir. Varsayılan değer `10` dakikadır; bu değer “son 10 dakika
+içinde görülmüş uçakları canlı kabul et” anlamına gelir.
+`live_positions` hâlâ uçak başına son bilinen durumu saklar; fakat bu pencerenin
+dışında kalan eski son konumlar harita ve canlı listeden gizlenir. Bu kayıtlar
+raw veri değildir, yalnızca artık canlı kabul edilmeyen son bilinen konumlardır.
+Uçak geçmişi sorguları `raw_positions` üzerinden yapılmaya devam eder.
 
-Producer şu anda OpenSky'dan Türkiye ve yakın çevresi için
-`35.00–43.50` enlem, `25.00–46.00` boylam kutusunu sorgular. Harita dünya
-üzerinde hareket edebilir; fakat bu veri toplama kutusunun dışında canlı uçak
-görülmez. Çağrı aralığı 30 saniyedir. Bu geniş kutu OpenSky kredi tüketimini
-artırır; anonim veya standart hesapta `429 Too Many Requests` görülmesi
-normaldir.
+Producer varsayılan olarak Türkiye ve yakın çevresi modunda kalabilir; global
+testlerde `OPENSKY_AREA_MODE=global` ve güvenli başlangıç için
+`POLL_INTERVAL_SECONDS=120` kullanılır. Harita dünya üzerinde hareket edebilir;
+ancak canlı uçak kapsamı producer'ın o anda topladığı alan kadar olur.
 
 Frontend veri akışı:
 
 1. Sayfa açıldığında `GET /api/aircraft` ile MongoDB snapshot alınır.
 2. `/ws/aircraft` bağlantısı kurulur.
 3. Bağlantı açıldıktan sonra arada kaçan veri ihtimaline karşı REST snapshot yenilenir.
-4. Yeni Kafka olayları toplu biçimde harita ve tabloya uygulanır.
+4. Yeni Kafka olayları WebSocket üzerinden tekil veya batch mesaj olarak gelir
+   ve frontend'de ekran karesi içinde toplu biçimde harita ve tabloya uygulanır.
 5. WebSocket koparsa artan bekleme süresiyle yeniden bağlanılır ve REST ile tekrar eşitlenir.
 
 Harita, yerel eğitimde API anahtarı gerektirmeyen OpenStreetMap raster tile
@@ -250,9 +245,12 @@ Bu tasarım veri kaybetmemeyi duplicate riskinden daha öncelikli tutan **at-lea
 | `KAFKA_REALTIME_CONSUMER_GROUP` | `flight-realtime-gateway-v1` | aynı | FastAPI WebSocket consumer offset kimliği |
 | `MONGODB_URI` | `mongodb://localhost:27017` | `mongodb://mongodb:27017` | MongoDB bağlantısı |
 | `MONGODB_DATABASE` | `flightdb` | aynı | Database adı |
+| `RAW_POSITIONS_RETENTION_HOURS` | `48` | `.env` veya `48` | `raw_positions` TTL saklama süresi |
 | `OPENSKY_AREA_MODE` | `turkey` | `.env` veya `turkey` | `turkey` veya `global` veri alanı |
-| `POLL_INTERVAL_SECONDS` | `30` | `30` | OpenSky çağrı aralığı |
-| `MAX_POLLS` | `0` | `0` | `0`, producer'ın sürekli çalışmasıdır |
+| `POLL_INTERVAL_SECONDS` | `30` | `.env` veya `30` | OpenSky çağrı aralığı |
+| `MAX_POLLS` | `0` | `.env` veya `0` | `0`, producer'ın sürekli çalışmasıdır |
+| `WEBSOCKET_BATCH_INTERVAL_MS` | `250` | `.env` veya `250` | FastAPI WebSocket batch süresi |
+| `WEBSOCKET_BATCH_MAX_SIZE` | `500` | `.env` veya `500` | FastAPI WebSocket batch uçak sınırı |
 | `OPENSKY_CLIENT_ID` | boş | host `.env` değerinden | OpenSky OAuth API client kimliği |
 | `OPENSKY_CLIENT_SECRET` | boş | host `.env` değerinden | OpenSky OAuth API client secret değeri |
 
@@ -363,6 +361,18 @@ veri getirir ve `/states/all` kredi tablosunda istek başına en yüksek maliyet
 sınıfına yaklaşır. Standart kayıtlı kullanıcı kotasıyla global mod için 30
 saniye aralık tüm gün sürdürülebilir değildir; `90` veya `120` saniye daha
 güvenli bir başlangıç aralığıdır.
+
+Global tek poll testi için `.env` veya geçici shell ortamında şu değerler
+kullanılabilir:
+
+```env
+OPENSKY_AREA_MODE=global
+POLL_INTERVAL_SECONDS=120
+MAX_POLLS=1
+```
+
+Sürekli global test için `MAX_POLLS=0` bırakılır. Global modda 90 saniyenin
+altında çağrı aralığı seçilirse producer loglarında açık kota uyarısı gösterir.
 
 OpenSky kayıtlı kullanıcı credential'ları verilirse producer OAuth2 client
 credentials akışıyla access token alır ve `/states/all` isteklerini `Bearer`

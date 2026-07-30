@@ -10,6 +10,7 @@ import type {
 
 
 const MAX_RECONNECT_DELAY_MS = 15_000;
+const SNAPSHOT_AIRCRAFT_LIMIT = 20_000;
 
 
 function websocketUrl() {
@@ -95,7 +96,7 @@ export function useAircraftFeed() {
 
     try {
       const [aircraftResponse, healthResponse] = await Promise.all([
-        fetch("/api/aircraft?limit=1000"),
+        fetch(`/api/aircraft?limit=${SNAPSHOT_AIRCRAFT_LIMIT}`),
         fetch("/health"),
       ]);
 
@@ -193,18 +194,28 @@ export function useAircraftFeed() {
           const message =
             JSON.parse(messageEvent.data) as RealtimeMessage;
 
-          if (
-            message.type !== "aircraft.position"
-            || !message.data?.icao24
-          ) {
+          if (message.type === "aircraft.position") {
+            if (!message.data?.icao24) {
+              return;
+            }
+
+            pendingUpdatesRef.current.set(
+              message.data.icao24,
+              message.data,
+            );
+            scheduleUpdateFlush();
             return;
           }
 
-          pendingUpdatesRef.current.set(
-            message.data.icao24,
-            message.data,
-          );
-          scheduleUpdateFlush();
+          if (message.type === "aircraft.batch") {
+            for (const item of message.items ?? []) {
+              if (item.icao24) {
+                pendingUpdatesRef.current.set(item.icao24, item);
+              }
+            }
+
+            scheduleUpdateFlush();
+          }
         } catch {
           setError("WebSocket mesajı okunamadı.");
         }

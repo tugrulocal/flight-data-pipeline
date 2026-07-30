@@ -34,11 +34,22 @@ export interface HealthResponse {
     mongodb: "up" | "down";
     kafka_realtime: "up" | "down";
   };
+  kafka?: {
+    topic: string;
+    consumer_group: string;
+    processed_messages: number;
+    published_batches: number;
+    skipped_messages: number;
+    last_error: string | null;
+    batch_interval_ms: number;
+    batch_max_size: number;
+  };
 }
 
 export interface RealtimeMessage {
-  type: "connection.ready" | "aircraft.position";
+  type: "connection.ready" | "aircraft.position" | "aircraft.batch";
   data?: Aircraft;
+  items?: Aircraft[];
 }
 
 export type ConnectionStatus =

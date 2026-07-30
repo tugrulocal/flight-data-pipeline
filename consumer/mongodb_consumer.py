@@ -31,6 +31,10 @@ DATABASE_NAME = os.getenv(
     "flightdb",
 )
 
+RAW_POSITIONS_RETENTION_HOURS = int(
+    os.getenv("RAW_POSITIONS_RETENTION_HOURS", "48")
+)
+
 
 consumer = Consumer(
     {
@@ -156,6 +160,12 @@ def prepare_indexes():
         name="idx_raw_aircraft_time",
     )
 
+    raw_collection.create_index(
+        [("observed_at", ASCENDING)],
+        name="idx_raw_observed_at_ttl",
+        expireAfterSeconds=RAW_POSITIONS_RETENTION_HOURS * 60 * 60,
+    )
+
 
 print("MongoDB bağlantısı kontrol ediliyor...")
 
@@ -165,6 +175,10 @@ try:
 
     prepare_indexes()
     print("MongoDB indexleri hazır.")
+    print(
+        "raw_positions retention: "
+        f"{RAW_POSITIONS_RETENTION_HOURS} saat"
+    )
 
     consumer.subscribe([TOPIC_NAME])
 

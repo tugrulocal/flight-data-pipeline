@@ -36,6 +36,8 @@ OPENSKY_CLIENT_ID = os.getenv("OPENSKY_CLIENT_ID")
 OPENSKY_CLIENT_SECRET = os.getenv("OPENSKY_CLIENT_SECRET")
 OPENSKY_AREA_MODE = os.getenv("OPENSKY_AREA_MODE", "turkey").strip().lower()
 TOKEN_REFRESH_MARGIN_SECONDS = 60
+GLOBAL_WARNING_POLL_INTERVAL_SECONDS = 90
+GLOBAL_RECOMMENDED_POLL_INTERVAL_SECONDS = 120
 
 # Türkiye ve yakın çevresi
 TURKEY_BOUNDING_BOX = {
@@ -274,6 +276,26 @@ def get_retry_seconds(response):
         return 3600
 
 
+def warn_for_risky_global_polling():
+    """Global modda kotayı hızlı tüketebilecek ayarları görünür yapar."""
+
+    if OPENSKY_AREA_MODE != "global":
+        return
+
+    print(
+        "Global mod aktif: OpenSky bounding box kullanılmadan "
+        "tüm dünya istenecek."
+    )
+
+    if POLL_INTERVAL_SECONDS < GLOBAL_WARNING_POLL_INTERVAL_SECONDS:
+        print(
+            "UYARI: Global modda kısa çağrı aralığı OpenSky kredisini "
+            "hızlı tüketebilir. "
+            f"Mevcut={POLL_INTERVAL_SECONDS}s, "
+            f"önerilen başlangıç={GLOBAL_RECOMMENDED_POLL_INTERVAL_SECONDS}s."
+        )
+
+
 def main():
     poll_number = 0
 
@@ -283,6 +305,7 @@ def main():
     print(f"Veri alanı modu: {OPENSKY_AREA_MODE}")
     print(f"OpenSky query params: {get_opensky_params()}")
     print(f"Çağrı aralığı: {POLL_INTERVAL_SECONDS} saniye")
+    warn_for_risky_global_polling()
     print(
         "OpenSky auth: "
         + (

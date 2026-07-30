@@ -14,8 +14,15 @@ class KafkaGatewayStatus:
     running: bool = False
     connected: bool = False
     processed_messages: int = 0
+    published_batches: int = 0
     skipped_messages: int = 0
     last_error: str | None = None
+
+
+@dataclass
+class PendingRealtimeMessage:
+    event: dict
+    message: object
 
 
 class KafkaRealtimeGateway:
@@ -25,6 +32,10 @@ class KafkaRealtimeGateway:
         self.settings = settings
         self.websocket_manager = websocket_manager
         self.status = KafkaGatewayStatus()
+        self._batch_interval_seconds = (
+            settings.websocket_batch_interval_ms / 1000
+        )
+        self._batch_max_size = settings.websocket_batch_max_size
 
     async def run(self, stop_event):
         """Gateway'i çalıştırır ve geçici Kafka hatalarında tekrar dener."""
@@ -81,18 +92,30 @@ class KafkaRealtimeGateway:
             self.status.last_error = None
 
             logger.info(
-                "Kafka realtime gateway hazır | topic=%s | group=%s",
+                "Kafka realtime gateway hazır | topic=%s | group=%s | "
+                "batch_interval_ms=%s | batch_max_size=%s",
                 self.settings.kafka_topic,
                 self.settings.kafka_realtime_consumer_group,
+                self.settings.websocket_batch_interval_ms,
+                self.settings.websocket_batch_max_size,
             )
+
+            pending_batch = []
+            last_flush_at = asyncio.get_running_loop().time()
 
             while not stop_event.is_set():
                 message = await asyncio.to_thread(
                     consumer.poll,
-                    1.0,
+                    self._poll_timeout_seconds(pending_batch),
                 )
 
                 if message is None:
+                    last_flush_at = await self._flush_due_batch(
+                        consumer,
+                        pending_batch,
+                        last_flush_at,
+                        force=True,
+                    )
                     continue
 
                 if message.error():
@@ -107,12 +130,32 @@ class KafkaRealtimeGateway:
                 await self._process_message(
                     consumer,
                     message,
+                    pending_batch,
                 )
+
+                last_flush_at = await self._flush_due_batch(
+                    consumer,
+                    pending_batch,
+                    last_flush_at,
+                )
+
+            await self._flush_due_batch(
+                consumer,
+                pending_batch,
+                last_flush_at,
+                force=True,
+            )
         finally:
             self.status.connected = False
             await asyncio.to_thread(consumer.close)
 
-    async def _process_message(self, consumer, message):
+    def _poll_timeout_seconds(self, pending_batch):
+        if pending_batch:
+            return self._batch_interval_seconds
+
+        return 1.0
+
+    async def _process_message(self, consumer, message, pending_batch):
         try:
             event = json.loads(
                 message.value().decode("utf-8")
@@ -138,36 +181,69 @@ class KafkaRealtimeGateway:
                 message.offset(),
                 error,
             )
+
+            await asyncio.to_thread(
+                consumer.commit,
+                message=message,
+                asynchronous=False,
+            )
         else:
-            await self.websocket_manager.broadcast(
-                {
-                    "type": "aircraft.position",
-                    "data": event,
-                    "kafka": {
-                        "topic": message.topic(),
-                        "partition": message.partition(),
-                        "offset": message.offset(),
-                    },
-                }
+            pending_batch.append(
+                PendingRealtimeMessage(
+                    event=event,
+                    message=message,
+                )
             )
 
-            self.status.processed_messages += 1
+    async def _flush_due_batch(
+        self,
+        consumer,
+        pending_batch,
+        last_flush_at,
+        force=False,
+    ):
+        if not pending_batch:
+            return last_flush_at
 
-            if (
-                self.status.processed_messages <= 10
-                or self.status.processed_messages % 100 == 0
-            ):
-                logger.info(
-                    "Realtime mesajı yayınlandı #%s | "
-                    "icao24=%s | offset=%s | clients=%s",
-                    self.status.processed_messages,
-                    event["icao24"],
-                    message.offset(),
-                    self.websocket_manager.connection_count,
-                )
+        now = asyncio.get_running_loop().time()
+        batch_is_full = len(pending_batch) >= self._batch_max_size
+        batch_is_due = now - last_flush_at >= self._batch_interval_seconds
 
-        await asyncio.to_thread(
-            consumer.commit,
-            message=message,
-            asynchronous=False,
+        if not force and not batch_is_full and not batch_is_due:
+            return last_flush_at
+
+        batch = pending_batch[:]
+        pending_batch.clear()
+
+        await self.websocket_manager.broadcast(
+            {
+                "type": "aircraft.batch",
+                "items": [item.event for item in batch],
+            }
         )
+
+        for item in batch:
+            await asyncio.to_thread(
+                consumer.commit,
+                message=item.message,
+                asynchronous=False,
+            )
+
+        self.status.processed_messages += len(batch)
+        self.status.published_batches += 1
+
+        if (
+            self.status.published_batches <= 10
+            or self.status.published_batches % 20 == 0
+        ):
+            last_message = batch[-1].message
+            logger.info(
+                "Realtime batch yayınlandı #%s | "
+                "adet=%s | son_offset=%s | clients=%s",
+                self.status.published_batches,
+                len(batch),
+                last_message.offset(),
+                self.websocket_manager.connection_count,
+            )
+
+        return now

@@ -45,9 +45,9 @@ button {
 }
 
 .app-shell {
-  width: min(1540px, 100%);
+  width: 100%;
   margin: 0 auto;
-  padding: 28px;
+  padding: 10px 10px 28px;
 }
 
 .topbar,
@@ -238,6 +238,218 @@ button {
   margin-bottom: 18px;
 }
 
+.flight-map-stage {
+  position: relative;
+  height: calc(100vh - 20px);
+  min-height: 720px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 22px;
+}
+
+.flight-map-stage .map-shell {
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 22px;
+}
+
+.map-stage-head {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  right: 18px;
+  left: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.map-top-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.map-stage-head .brand,
+.map-stage-head .connection-pill,
+.map-theme-toggle,
+.map-metrics article,
+.map-count-pill {
+  border: 1px solid rgba(8, 20, 29, 0.32);
+  background: rgba(5, 14, 22, 0.78);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.map-stage-head .brand {
+  padding: 10px 13px;
+  border-radius: 18px;
+}
+
+.map-theme-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.map-theme-toggle button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.map-theme-toggle button.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.map-theme-toggle button:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.theme-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-origin: 50% 50%;
+}
+
+.sun-icon circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.moon-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.map-theme-toggle button:hover .sun-icon {
+  animation: sun-orbit 850ms ease-in-out;
+}
+
+.map-theme-toggle button:hover .moon-icon {
+  animation: moon-float 850ms ease-in-out;
+}
+
+@keyframes sun-orbit {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(255, 210, 80, 0));
+    transform: rotate(0deg) scale(1);
+  }
+
+  45% {
+    filter: drop-shadow(0 0 8px rgba(255, 210, 80, 0.8));
+    transform: rotate(45deg) scale(1.12);
+  }
+
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 210, 80, 0));
+    transform: rotate(90deg) scale(1);
+  }
+}
+
+@keyframes moon-float {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(150, 190, 255, 0));
+    transform: translateX(0) rotate(0deg);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px rgba(150, 190, 255, 0.75));
+    transform: translateX(3px) translateY(-2px) rotate(-10deg);
+  }
+
+  100% {
+    filter: drop-shadow(0 0 0 rgba(150, 190, 255, 0));
+    transform: translateX(0) rotate(0deg);
+  }
+}
+
+.flight-map-stage > .map-engine-switch {
+  position: absolute;
+  z-index: 7;
+  top: 98px;
+  left: 18px;
+  margin: 0;
+  background: rgba(5, 14, 22, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.map-metrics {
+  position: absolute;
+  z-index: 6;
+  top: 118px;
+  right: 18px;
+  width: min(312px, calc(100% - 36px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.map-metrics article {
+  min-height: 70px;
+  padding: 10px 11px;
+  border-radius: 14px;
+}
+
+.map-metrics span {
+  font-size: 0.62rem;
+}
+
+.map-metrics strong {
+  margin: 2px 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+}
+
+.map-metrics small {
+  font-size: 0.58rem;
+}
+
+.map-metrics .system-state {
+  font-size: clamp(0.86rem, 1.7vw, 1.08rem);
+}
+
+.map-count-pill {
+  position: absolute;
+  z-index: 6;
+  right: 18px;
+  bottom: 78px;
+  max-width: min(520px, calc(100% - 36px));
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #d9edf1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.table-panel {
+  width: min(1540px, calc(100% - 20px));
+  margin: 0 auto;
+}
+
 .section-heading {
   justify-content: space-between;
   gap: 18px;
@@ -321,13 +533,15 @@ button {
   outline: none;
 }
 
-
+.flight-map-stage .maplibregl-ctrl-top-left,
+.flight-map-stage .leaflet-top.leaflet-left {
+  top: 146px;
+  left: 18px;
+}
 
 .maplibre-projection-bar {
   position: absolute;
-  z-index: 3;
-  bottom: 32px;
-  right: 12px;
+  z-index: 4;
   display: inline-flex;
   gap: 4px;
   padding: 4px;
@@ -356,6 +570,13 @@ button {
 
 .maplibre-projection-bar button:hover:not(.active) {
   color: #eaf5f7;
+}
+
+
+
+.maplibre-projection-bar {
+  bottom: 32px;
+  right: 12px;
 }
 
 .map-shell .leaflet-container {
@@ -422,50 +643,63 @@ button {
 .altitude-legend {
   position: absolute;
   z-index: 1000;
-  right: 12px;
-  top: 12px;
-  width: min(286px, calc(100% - 78px));
+  right: 170px;
+  bottom: 16px;
+  left: 72px;
   display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 12px;
-  background: rgba(5, 14, 22, 0.94);
-  color: #d9edf1;
-  font-size: 0.7rem;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  padding: 7px 9px;
+  border: 1px solid rgba(6, 19, 29, 0.24);
+  border-radius: 6px;
+  background: rgba(234, 243, 238, 0.62);
+  color: #06131d;
+  font-size: 0.64rem;
+  box-shadow: none;
   pointer-events: none;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(4px);
 }
 
 .altitude-legend strong {
-  color: #fff;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  color: #06131d;
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .altitude-legend-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  grid-template-columns: repeat(11, minmax(42px, 1fr));
+  gap: 0;
+  min-width: 0;
 }
 
 .altitude-legend-grid span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+  display: grid;
+  grid-template-rows: 16px auto;
+  gap: 3px;
   min-width: 0;
+  color: #06131d;
+  font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .legend-swatch {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+  display: block;
+  width: 100%;
+  height: 16px;
+  border-left: 2px solid rgba(6, 19, 29, 0.82);
+  border-radius: 0;
   background: var(--legend-color);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.34);
+  box-shadow: none;
+}
+
+.altitude-legend-grid span:first-child .legend-swatch {
+  border-left: 0;
 }
 
 .route-status {
@@ -559,6 +793,7 @@ button {
 .aircraft-popup {
   display: grid;
   min-width: 260px;
+  max-width: 300px;
   gap: 5px;
 }
 
@@ -578,6 +813,10 @@ button {
   display: grid;
 }
 
+.aircraft-popup .popup-observed {
+  min-width: 0;
+}
+
 .aircraft-popup dt {
   color: var(--muted);
   font-size: 0.64rem;
@@ -587,6 +826,17 @@ button {
   margin: 2px 0 0;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.aircraft-popup .popup-observed-at {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.aircraft-popup .popup-time {
+  display: inline-block;
+  margin-top: 2px;
 }
 
 .table-heading {
@@ -714,22 +964,31 @@ tbody tr:hover,
 }
 
 @media (max-width: 900px) {
-  .metrics {
+  .map-metrics {
+    top: auto;
+    right: 12px;
+    bottom: 82px;
+    left: 12px;
+    width: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .map-shell {
-    height: 520px;
+  .flight-map-stage {
+    height: 86vh;
+    min-height: 620px;
   }
 }
 
 @media (max-width: 620px) {
   .app-shell {
-    padding: 18px 12px;
+    padding: 8px 8px 22px;
   }
 
-  .topbar {
+  .map-stage-head {
     align-items: flex-start;
+    top: 10px;
+    right: 10px;
+    left: 10px;
   }
 
   .connection-pill {
@@ -740,34 +999,40 @@ tbody tr:hover,
     display: none;
   }
 
-  .metrics {
-    gap: 9px;
+  .flight-map-stage > .map-engine-switch {
+    top: 86px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+    overflow-x: auto;
   }
 
-  .metrics article {
-    min-height: 105px;
-    padding: 14px;
+  .map-metrics {
+    display: none;
   }
 
-  .map-panel,
   .table-panel {
     padding: 12px;
     border-radius: 15px;
   }
 
-  .map-shell {
-    height: 58vh;
-    min-height: 400px;
+  .flight-map-stage {
+    height: 88vh;
+    min-height: 560px;
+    border-radius: 16px;
   }
 
   .altitude-legend {
     right: 8px;
-    top: 8px;
-    width: min(250px, calc(100% - 62px));
+    bottom: 58px;
+    left: 8px;
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 
   .altitude-legend-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(11, minmax(36px, 1fr));
+    overflow: hidden;
+    font-size: 0.54rem;
   }
 
   .route-status {

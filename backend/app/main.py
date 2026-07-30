@@ -163,10 +163,19 @@ async def health(request: Request):
             "processed_messages": (
                 gateway.status.processed_messages
             ),
+            "published_batches": (
+                gateway.status.published_batches
+            ),
             "skipped_messages": (
                 gateway.status.skipped_messages
             ),
             "last_error": gateway.status.last_error,
+            "batch_interval_ms": (
+                settings.websocket_batch_interval_ms
+            ),
+            "batch_max_size": (
+                settings.websocket_batch_max_size
+            ),
         },
         "websocket_clients": (
             request.app.state
@@ -184,7 +193,7 @@ async def health(request: Request):
 @app.get("/api/aircraft")
 async def list_aircraft(
     request: Request,
-    limit: int = Query(default=200, ge=1, le=1000),
+    limit: int = Query(default=200, ge=1, le=20000),
 ):
     aircraft = await run_mongo(
         repository_from(request).list_live_aircraft,

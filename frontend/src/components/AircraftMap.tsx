@@ -328,9 +328,9 @@ export function AircraftMap({
         className="altitude-legend"
         aria-label="İrtifaya göre uçak renkleri"
       >
-        <strong>İrtifa aralıkları</strong>
+        <strong>Altıtude (ft)</strong>
         <div className="altitude-legend-grid">
-          {ALTITUDE_LEGEND.map((item) => (
+          {ALTITUDE_LEGEND.filter((item) => !("hiddenFromScale" in item)).map((item) => (
             <span key={item.key}>
               <i
                 className="legend-swatch"

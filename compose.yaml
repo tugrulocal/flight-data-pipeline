@@ -93,7 +93,7 @@ services:
     build:
       context: .
       dockerfile: producer/Dockerfile
-    restart: unless-stopped
+    restart: ${PRODUCER_RESTART_POLICY:-unless-stopped}
 
     depends_on:
       topic-init:
@@ -102,8 +102,8 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC: aircraft.positions.raw.v1
-      POLL_INTERVAL_SECONDS: "30"
-      MAX_POLLS: "0"
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-30}
+      MAX_POLLS: ${MAX_POLLS:-0}
       OPENSKY_AREA_MODE: ${OPENSKY_AREA_MODE:-turkey}
       OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
       OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
@@ -126,6 +126,7 @@ services:
       KAFKA_CONSUMER_GROUP: flight-mongodb-writer-v1
       MONGODB_URI: mongodb://mongodb:27017
       MONGODB_DATABASE: flightdb
+      RAW_POSITIONS_RETENTION_HOURS: ${RAW_POSITIONS_RETENTION_HOURS:-48}
 
   backend:
     build:
@@ -144,6 +145,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC: aircraft.positions.raw.v1
       KAFKA_REALTIME_CONSUMER_GROUP: flight-realtime-gateway-v1
+      WEBSOCKET_BATCH_INTERVAL_MS: ${WEBSOCKET_BATCH_INTERVAL_MS:-250}
+      WEBSOCKET_BATCH_MAX_SIZE: ${WEBSOCKET_BATCH_MAX_SIZE:-500}
       MONGODB_URI: mongodb://mongodb:27017
       MONGODB_DATABASE: flightdb
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
@@ -166,6 +169,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_LIVE_POSITION_WINDOW_MINUTES: ${VITE_LIVE_POSITION_WINDOW_MINUTES:-10}
     restart: unless-stopped
 
     depends_on:

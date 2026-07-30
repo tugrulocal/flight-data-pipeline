@@ -23,6 +23,7 @@ import {
 } from "../lib/formatters";
 import {
   ALTITUDE_LEGEND,
+  altitudeBucketKey,
   altitudeColor,
 } from "../lib/altitudeColors";
 
@@ -38,12 +39,61 @@ const INITIAL_CENTER: [number, number] = [28.0, 20.0];
 const MERCATOR_ZOOM = 2.5;
 const GLOBE_ZOOM = 1.8;
 
-const MAPLIBRE_STYLE_URL = "https://demotiles.maplibre.org/style.json";
+export type MapTheme = "light" | "dark";
+
+const MAPLIBRE_STYLES: Record<MapTheme, maplibregl.StyleSpecification> = {
+  light: {
+    version: 8,
+    sources: {
+      basemap: {
+        type: "raster",
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors",
+      },
+    },
+    layers: [
+      {
+        id: "basemap",
+        type: "raster",
+        source: "basemap",
+      },
+    ],
+  },
+  dark: {
+    version: 8,
+    sources: {
+      basemap: {
+        type: "raster",
+        tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors © CARTO",
+      },
+    },
+    layers: [
+      {
+        id: "basemap",
+        type: "raster",
+        source: "basemap",
+      },
+    ],
+  },
+};
 
 
 
 /** Uçak ikonu boyutu (px) */
 const ICON_SIZE = 48;
+const HOVER_POPUP_DELAY_MS = 1_500;
+const DEFAULT_ROUTE_GRADIENT = [
+  "interpolate",
+  ["linear"],
+  ["line-progress"],
+  0,
+  "#28f3ff",
+  1,
+  "#28f3ff",
+] as unknown as maplibregl.ExpressionSpecification;
 
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +105,7 @@ interface MapLibreMapProps {
   selectedAircraft: Aircraft | null;
   selectedRoute: Aircraft[];
   routeStatus: "idle" | "loading" | "ready" | "empty" | "error";
+  mapTheme: MapTheme;
   onSelectAircraft: (icao24: string | null) => void;
 }
 
@@ -84,33 +135,7 @@ function hasValidPosition(item: Aircraft) {
 
 
 function altitudeBucket(item: Aircraft) {
-  if (item.on_ground) {
-    return "ground";
-  }
-
-  const altitude = item.baro_altitude_m;
-
-  if (altitude === null || !Number.isFinite(altitude)) {
-    return "unknown";
-  }
-
-  if (altitude < 1_500) {
-    return "low";
-  }
-
-  if (altitude < 4_500) {
-    return "lower-mid";
-  }
-
-  if (altitude < 9_000) {
-    return "mid";
-  }
-
-  if (altitude < 11_500) {
-    return "high";
-  }
-
-  return "very-high";
+  return altitudeBucketKey(item);
 }
 
 
@@ -139,8 +164,8 @@ function aircraftToFeature(
 
 
 /**
- * Canvas API ile uçak silüeti (✈ benzeri ok şekli) çizer.
- * Her irtifa rengi için ayrı bir icon üretilir.
+ * Canvas API ile küçük ama okunaklı bir uçak silüeti çizer.
+ * MapLibre sembol katmanı bu bitmap'i WebGL içinde binlerce kez basar.
  */
 function createAircraftIconImage(color: string): ImageData {
   const canvas = document.createElement("canvas");
@@ -152,32 +177,46 @@ function createAircraftIconImage(color: string): ImageData {
   const cy = ICON_SIZE / 2;
 
   ctx.clearRect(0, 0, ICON_SIZE, ICON_SIZE);
-  
-  // Dış çerçeve (halo efekti için kalın kontur)
+
+  // Kuzeye bakan, geniş kanatlı uçak silüeti.
   ctx.fillStyle = color;
-  ctx.strokeStyle = "#06131d"; // Koyu arka plan
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#06131d";
+  ctx.lineWidth = 3.4;
   ctx.lineJoin = "round";
+  ctx.lineCap = "round";
 
   ctx.beginPath();
-  // Kuzeye bakan uçak silüeti — üçgen gövde + kanatlar
-  ctx.moveTo(cx, cy - 20);       // Burun (üst)
-  ctx.lineTo(cx + 5, cy - 8);    // Sağ gövde
-  ctx.lineTo(cx + 18, cy + 2);   // Sağ kanat ucu
-  ctx.lineTo(cx + 5, cy + 0);    // Sağ kanat iç
-  ctx.lineTo(cx + 4, cy + 10);   // Sağ gövde alt
-  ctx.lineTo(cx + 9, cy + 16);   // Sağ kuyruk
-  ctx.lineTo(cx + 2, cy + 12);   // Sağ kuyruk iç
-  ctx.lineTo(cx, cy + 14);       // Kuyruk merkez
-  ctx.lineTo(cx - 2, cy + 12);   // Sol kuyruk iç
-  ctx.lineTo(cx - 9, cy + 16);   // Sol kuyruk
-  ctx.lineTo(cx - 4, cy + 10);   // Sol gövde alt
-  ctx.lineTo(cx - 5, cy + 0);    // Sol kanat iç
-  ctx.lineTo(cx - 18, cy + 2);   // Sol kanat ucu
-  ctx.lineTo(cx - 5, cy - 8);    // Sol gövde
+  ctx.moveTo(cx, cy - 22);       // Burun
+  ctx.lineTo(cx + 4, cy - 15);
+  ctx.lineTo(cx + 5, cy - 5);
+  ctx.lineTo(cx + 20, cy + 4);   // Sağ ana kanat
+  ctx.lineTo(cx + 20, cy + 9);
+  ctx.lineTo(cx + 5, cy + 5);
+  ctx.lineTo(cx + 4, cy + 13);
+  ctx.lineTo(cx + 11, cy + 19);  // Sağ kuyruk kanadı
+  ctx.lineTo(cx + 11, cy + 23);
+  ctx.lineTo(cx + 1, cy + 18);
+  ctx.lineTo(cx, cy + 22);       // Kuyruk ucu
+  ctx.lineTo(cx - 1, cy + 18);
+  ctx.lineTo(cx - 11, cy + 23);
+  ctx.lineTo(cx - 11, cy + 19);  // Sol kuyruk kanadı
+  ctx.lineTo(cx - 4, cy + 13);
+  ctx.lineTo(cx - 5, cy + 5);
+  ctx.lineTo(cx - 20, cy + 9);
+  ctx.lineTo(cx - 20, cy + 4);   // Sol ana kanat
+  ctx.lineTo(cx - 5, cy - 5);
+  ctx.lineTo(cx - 4, cy - 15);
   ctx.closePath();
-  
+
+  ctx.stroke();
   ctx.fill();
+
+  // Gövde çizgisi ikonu "ok" gibi değil, uçak gibi okutuyor.
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 17);
+  ctx.lineTo(cx, cy + 15);
+  ctx.strokeStyle = "rgba(6, 19, 29, 0.45)";
+  ctx.lineWidth = 1.7;
   ctx.stroke();
 
   return ctx.getImageData(0, 0, ICON_SIZE, ICON_SIZE);
@@ -194,12 +233,58 @@ function escapeHtml(value: string | null | undefined) {
 }
 
 
+function popupDateTimeHtml(value: string | null) {
+  const formatted = formatDateTime(value);
+  const match = formatted.match(/^(.*) (\d{2}:\d{2}:\d{2})$/);
+
+  if (!match) {
+    return escapeHtml(formatted);
+  }
+
+  return `${escapeHtml(match[1])}<br /><span class="popup-time">${escapeHtml(match[2])}</span>`;
+}
+
+
+function featurePropertiesToPopupProps(
+  properties: Record<string, unknown> | null | undefined,
+): AircraftPointProperties | null {
+  if (!properties || typeof properties.icao24 !== "string") {
+    return null;
+  }
+
+  const nullableNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  };
+
+  return {
+    icao24: properties.icao24,
+    callsign: typeof properties.callsign === "string"
+      ? properties.callsign
+      : properties.icao24,
+    origin_country: typeof properties.origin_country === "string"
+      ? properties.origin_country
+      : "Bilinmiyor",
+    altitude_bucket: typeof properties.altitude_bucket === "string"
+      ? properties.altitude_bucket
+      : "unknown",
+    altitude_m: nullableNumber(properties.altitude_m),
+    heading_deg: nullableNumber(properties.heading_deg),
+    velocity_mps: nullableNumber(properties.velocity_mps),
+    observed_at: typeof properties.observed_at === "string"
+      ? properties.observed_at
+      : null,
+    on_ground: typeof properties.on_ground === "boolean"
+      ? properties.on_ground
+      : null,
+  };
+}
+
+
 function popupHtml(properties: AircraftPointProperties) {
   const title = escapeHtml(properties.callsign || properties.icao24);
   const country = escapeHtml(properties.origin_country || "Bilinmiyor");
-  const observedAt = escapeHtml(
-    formatDateTime(properties.observed_at),
-  );
+  const observedAt = popupDateTimeHtml(properties.observed_at);
 
   return `
     <div class="aircraft-popup">
@@ -218,9 +303,9 @@ function popupHtml(properties: AircraftPointProperties) {
           <dt>Yön</dt>
           <dd>${formatHeading(properties.heading_deg)}</dd>
         </div>
-        <div>
+        <div class="popup-observed">
           <dt>Son görülme</dt>
-          <dd>${observedAt}</dd>
+          <dd class="popup-observed-at">${observedAt}</dd>
         </div>
       </dl>
     </div>
@@ -229,39 +314,54 @@ function popupHtml(properties: AircraftPointProperties) {
 
 
 /**
- * Rota noktalarından irtifa renkli segment GeoJSON'ı üretir.
- * Her segment ayrı bir Feature olarak oluşturulur, böylece
- * her birinin kendi rengi olabilir.
+ * Rota noktalarından tek bir LineString üretir.
+ * Renk geçişini ayrı segmentlerle değil, MapLibre line-gradient ile yapıyoruz.
  */
 function routeToGeoJson(
   route: Aircraft[],
-): FeatureCollection<LineString, { color: string }> {
-  const features: Feature<LineString, { color: string }>[] = [];
+): FeatureCollection<LineString> {
+  const coordinates = route
+    .filter(hasValidPosition)
+    .map((item) => [item.longitude, item.latitude]);
 
-  for (let i = 1; i < route.length; i += 1) {
-    const prev = route[i - 1];
-    const curr = route[i];
+  return {
+    type: "FeatureCollection",
+    features: coordinates.length > 1
+      ? [{
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates,
+          },
+          properties: {},
+        }]
+      : [],
+  };
+}
 
-    if (!hasValidPosition(prev) || !hasValidPosition(curr)) {
-      continue;
-    }
 
-    features.push({
-      type: "Feature",
-      geometry: {
-        type: "LineString",
-        coordinates: [
-          [prev.longitude, prev.latitude],
-          [curr.longitude, curr.latitude],
-        ],
-      },
-      properties: {
-        color: altitudeColor(curr),
-      },
-    });
+function routeGradientExpression(route: Aircraft[]) {
+  const validRoute = route.filter(hasValidPosition);
+
+  if (validRoute.length < 2) {
+    return DEFAULT_ROUTE_GRADIENT;
   }
 
-  return { type: "FeatureCollection", features };
+  const expression: unknown[] = [
+    "interpolate",
+    ["linear"],
+    ["line-progress"],
+  ];
+
+  validRoute.forEach((item, index) => {
+    const progress = validRoute.length === 1
+      ? 0
+      : index / (validRoute.length - 1);
+
+    expression.push(progress, altitudeColor(item));
+  });
+
+  return expression as maplibregl.ExpressionSpecification;
 }
 
 
@@ -329,12 +429,16 @@ export function MapLibreMap({
   selectedAircraft,
   selectedRoute,
   routeStatus,
+  mapTheme,
   onSelectAircraft,
 }: MapLibreMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const hoverPopupRef = useRef<maplibregl.Popup | null>(null);
+  const hoverTimerRef = useRef<number | null>(null);
   const onSelectRef = useRef(onSelectAircraft);
+  const currentThemeRef = useRef<MapTheme>("light");
   const [projectionMode, setProjectionMode] =
     useState<"mercator" | "globe">("mercator");
 
@@ -368,6 +472,32 @@ export function MapLibreMap({
     [selectedRoute],
   );
 
+  const routeGradient = useMemo(
+    () => routeGradientExpression(selectedRoute),
+    [selectedRoute],
+  );
+
+  const routeGeoJsonRef = useRef(routeGeoJson);
+  const routeEndpointsRef = useRef(routeEndpoints);
+  const routeGradientRef = useRef(routeGradient);
+  const projectionModeRef = useRef(projectionMode);
+
+  useEffect(() => {
+    routeGeoJsonRef.current = routeGeoJson;
+  }, [routeGeoJson]);
+
+  useEffect(() => {
+    routeEndpointsRef.current = routeEndpoints;
+  }, [routeEndpoints]);
+
+  useEffect(() => {
+    routeGradientRef.current = routeGradient;
+  }, [routeGradient]);
+
+  useEffect(() => {
+    projectionModeRef.current = projectionMode;
+  }, [projectionMode]);
+
 
   /* ================================================================ */
   /*  Harita başlatma (mount'ta bir kere)                             */
@@ -382,7 +512,7 @@ export function MapLibreMap({
 
     const map = new maplibregl.Map({
       container,
-      style: MAPLIBRE_STYLE_URL,
+      style: MAPLIBRE_STYLES.light,
       center: INITIAL_CENTER,
       zoom: MERCATOR_ZOOM,
       minZoom: 1,
@@ -395,6 +525,7 @@ export function MapLibreMap({
     );
 
     mapRef.current = map;
+    let interactionsBound = false;
 
     map.on("style.load", () => {
       /* Her irtifa rengi için ayrı bir Canvas ikonu ekle */
@@ -409,7 +540,8 @@ export function MapLibreMap({
       if (!map.getSource("route-lines")) {
         map.addSource("route-lines", {
           type: "geojson",
-          data: EMPTY_FC_LINE,
+          data: routeGeoJsonRef.current,
+          lineMetrics: true,
         });
       }
 
@@ -419,9 +551,9 @@ export function MapLibreMap({
           type: "line",
           source: "route-lines",
           paint: {
-            "line-color": ["get", "color"],
+            "line-gradient": routeGradientRef.current,
             "line-width": 3.5,
-            "line-opacity": 0.88,
+            "line-opacity": 0.94,
           },
           layout: {
             "line-cap": "round",
@@ -433,7 +565,7 @@ export function MapLibreMap({
       if (!map.getSource("route-endpoints")) {
         map.addSource("route-endpoints", {
           type: "geojson",
-          data: EMPTY_FC_POINT,
+          data: routeEndpointsRef.current,
         });
       }
 
@@ -487,13 +619,18 @@ export function MapLibreMap({
             "icon-image": [
               "match",
               ["get", "altitude_bucket"],
-              "ground", "aircraft-ground",
+              "ft-0", "aircraft-ft-0",
+              "ft-500", "aircraft-ft-500",
+              "ft-1000", "aircraft-ft-1000",
+              "ft-2000", "aircraft-ft-2000",
+              "ft-4000", "aircraft-ft-4000",
+              "ft-6000", "aircraft-ft-6000",
+              "ft-8000", "aircraft-ft-8000",
+              "ft-10000", "aircraft-ft-10000",
+              "ft-20000", "aircraft-ft-20000",
+              "ft-30000", "aircraft-ft-30000",
+              "ft-40000", "aircraft-ft-40000",
               "unknown", "aircraft-unknown",
-              "low", "aircraft-low",
-              "lower-mid", "aircraft-lower-mid",
-              "mid", "aircraft-mid",
-              "high", "aircraft-high",
-              "very-high", "aircraft-very-high",
               "aircraft-unknown",
             ],
             "icon-size": [
@@ -522,13 +659,56 @@ export function MapLibreMap({
         });
       }
 
+      const clearHoverPopup = () => {
+        if (hoverTimerRef.current !== null) {
+          window.clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = null;
+        }
+
+        hoverPopupRef.current?.remove();
+        hoverPopupRef.current = null;
+      };
+
+      map.setProjection({ type: projectionModeRef.current });
+
+      if (interactionsBound) {
+        return;
+      }
+
+      interactionsBound = true;
+
       /* ----- Etkileşim ----- */
-      map.on("mouseenter", "aircraft-icons", () => {
+      map.on("mouseenter", "aircraft-icons", (event) => {
         map.getCanvas().style.cursor = "pointer";
+
+        const feature = event.features?.[0];
+        const props = featurePropertiesToPopupProps(
+          feature?.properties as Record<string, unknown> | undefined,
+        );
+
+        if (!feature || !props || feature.geometry.type !== "Point") {
+          return;
+        }
+
+        const coordinates = feature.geometry.coordinates as [number, number];
+
+        hoverTimerRef.current = window.setTimeout(() => {
+          hoverPopupRef.current?.remove();
+          hoverPopupRef.current = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 14,
+            className: "maplibre-aircraft-popup hover-popup",
+          })
+            .setLngLat(coordinates)
+            .setHTML(popupHtml(props))
+            .addTo(map);
+        }, HOVER_POPUP_DELAY_MS);
       });
 
       map.on("mouseleave", "aircraft-icons", () => {
         map.getCanvas().style.cursor = "";
+        clearHoverPopup();
       });
 
       map.on("click", "aircraft-icons", (event) => {
@@ -539,6 +719,7 @@ export function MapLibreMap({
           return;
         }
 
+        clearHoverPopup();
         onSelectRef.current(icao24);
       });
 
@@ -554,11 +735,42 @@ export function MapLibreMap({
     });
 
     return () => {
+      if (hoverTimerRef.current !== null) {
+        window.clearTimeout(hoverTimerRef.current);
+      }
+      hoverPopupRef.current?.remove();
+      popupRef.current?.remove();
       map.remove();
       mapRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+  /* ================================================================ */
+  /*  Harita tema değişimi                                            */
+  /* ================================================================ */
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    if (currentThemeRef.current === mapTheme) {
+      return;
+    }
+
+    currentThemeRef.current = mapTheme;
+
+    hoverPopupRef.current?.remove();
+    hoverPopupRef.current = null;
+    popupRef.current?.remove();
+    popupRef.current = null;
+
+    map.setStyle(MAPLIBRE_STYLES[mapTheme]);
+  }, [mapTheme]);
 
 
   /* ================================================================ */
@@ -632,10 +844,18 @@ export function MapLibreMap({
       lineSource.setData(routeGeoJson);
     }
 
+    if (map.getLayer("route-lines-layer")) {
+      map.setPaintProperty(
+        "route-lines-layer",
+        "line-gradient",
+        routeGradient,
+      );
+    }
+
     if (pointSource) {
       pointSource.setData(routeEndpoints);
     }
-  }, [routeGeoJson, routeEndpoints]);
+  }, [routeGeoJson, routeEndpoints, routeGradient]);
 
 
   /* ================================================================ */
@@ -736,9 +956,9 @@ export function MapLibreMap({
         className="altitude-legend"
         aria-label="İrtifaya göre uçak renkleri"
       >
-        <strong>İrtifa aralıkları</strong>
+        <strong>Altitude (ft)</strong>
         <div className="altitude-legend-grid">
-          {ALTITUDE_LEGEND.map((item) => (
+          {ALTITUDE_LEGEND.filter((item) => !("hiddenFromScale" in item)).map((item) => (
             <span key={item.key}>
               <i
                 className="legend-swatch"
