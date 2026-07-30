@@ -70,23 +70,29 @@ flightdb
 - [x] Producer ve consumer Docker image'ları
 - [x] Producer ve consumer Compose servisleri
 - [x] Producer → Kafka → consumer → MongoDB akış doğrulaması
+- [x] FastAPI backend, Docker image ve Compose servisi
+- [x] Sağlık, canlı uçak, detay, geçmiş ve istatistik REST endpoint'leri
+- [x] `flight-realtime-gateway-v1` group'uyla Kafka consumer
+- [x] Kafka mesajlarını frontend'e yayınlayan WebSocket endpoint'i
+- [x] REST, WebSocket, iki consumer group ve kontrollü kapanış doğrulaması
+- [x] React + TypeScript frontend
+- [x] Leaflet canlı uçuş haritası
+- [x] Canlı uçak tablosu, arama ve sistem durumu
+- [x] REST snapshot, WebSocket reconnect ve yeniden eşitleme akışı
+- [x] Nginx frontend image ve aynı-origin backend proxy
+- [x] Nginx üzerinden gerçek OpenSky WebSocket mesajı doğrulaması
 
 ### Şu anda yapılacak
 
-- [ ] FastAPI backend iskeleti ve sağlık kontrolü
-- [ ] `live_positions` tabanlı canlı uçak REST endpoint'leri
-- [ ] `raw_positions` tabanlı uçak geçmişi endpoint'i
-- [ ] `flight-realtime-gateway-v1` group'uyla Kafka consumer
-- [ ] Kafka mesajlarını frontend'e yayınlayan WebSocket endpoint'i
+- [ ] Consumer retry sınırı
+- [ ] Dead-letter topic
+- [ ] Yapılandırılmış loglar ve temel metrikler
 
 ### Sonraki aşamalar
 
-- [ ] Temel istatistik endpoint'i
-- [ ] Frontend uçak tablosu
-- [ ] Frontend harita görünümü
-- [ ] WebSocket kopmasından sonra REST ile durum toparlama
-- [ ] Retry ve dead-letter topic
-- [ ] Healthcheck, loglama ve gözlemlenebilirlik iyileştirmeleri
+- [ ] Frontend otomatik testleri ve erişilebilirlik kontrolü
+- [ ] Production harita tile sağlayıcısı seçimi
+- [ ] Gözlemlenebilirlik iyileştirmeleri
 
 ## MongoDB veri modeli
 
@@ -131,12 +137,88 @@ Yeni mesaj geldiğinde mevcut uçak belgesi `upsert` ile güncellenir. Frontend 
 
 ## Backend veri erişim kararı
 
-FastAPI iki farklı veri yolu sunacaktır:
+FastAPI iki farklı veri yolu sunar:
 
 1. **REST API:** İlk sayfa yüklemesi ve bağlantı sonrası yeniden eşitleme için `live_positions` okur. Bir uçağın geçmiş sorguları `raw_positions` üzerinden yapılır.
 2. **WebSocket:** FastAPI, `aircraft.positions.raw.v1` topic'ini `flight-realtime-gateway-v1` group'uyla tüketir ve yeni mesajları bağlı frontend istemcilerine anlık yayınlar.
 
 WebSocket geçici, düşük gecikmeli güncelleme kanalıdır; MongoDB ise yeniden bağlanıldığında başvurulan kalıcı durum kaynağıdır. Frontend Kafka broker'a veya MongoDB'ye doğrudan bağlanmaz.
+
+### Backend endpoint'leri
+
+| Yöntem | Yol | Veri kaynağı | Amaç |
+|---|---|---|---|
+| `GET` | `/health` | MongoDB + Kafka durumu | Servis sağlığı |
+| `GET` | `/api/aircraft?limit=200` | `live_positions` | Canlı uçak listesi |
+| `GET` | `/api/aircraft/{icao24}` | `live_positions` | Tek uçağın son durumu |
+| `GET` | `/api/aircraft/{icao24}/history?limit=100` | `raw_positions` | Uçak geçmişi |
+| `GET` | `/api/stats` | `live_positions` | Temel uçak sayaçları |
+| WebSocket | `/ws/aircraft` | Kafka realtime consumer | Yeni konum yayınları |
+
+Swagger arayüzü `http://localhost:8000/docs`, OpenAPI şeması `http://localhost:8000/openapi.json` adresindedir.
+
+WebSocket bağlantısı önce `connection.ready`, ardından yeni Kafka kayıtları için `aircraft.position` mesajları gönderir. `connection.ready`, ilk verinin WebSocket'ten geleceği anlamına gelmez; frontend başlangıç snapshot'ını REST endpoint'inden almalıdır.
+
+## Frontend teknoloji ve performans kararı
+
+React ve CSS birbirinin alternatifi değildir:
+
+- **React + TypeScript**, REST/WebSocket verisini, bağlantı durumunu, filtreyi ve seçili uçağı yönetir.
+- **CSS**, yerleşimi, renkleri, responsive görünümü ve tablo stilini yönetir.
+- **Leaflet**, harita pan/zoom etkileşimini ve marker katmanını yönetir.
+- **Vite**, TypeScript kontrolü ve production build işlemini yapar.
+- **Nginx**, statik frontend dosyalarını sunar; `/api`, `/health` ve `/ws` yollarını FastAPI'ye proxy eder.
+
+Harita MapLibre yerine Leaflet ile çalışır. Bunun nedeni bu aşamada daha sade
+bir event modeliyle güvenilir pan/zoom davranışı almak ve frontend bundle
+boyutunu küçültmektir. Uçaklar React component ağacı içinde tek tek yeniden
+render edilmez; Leaflet marker layer'ı içinde `divIcon` uçak sembolleri olarak
+gösterilir ve uçuş yönüne göre döndürülür. Harita zoom/pan state'i React'e
+taşınmaz; Leaflet kendi içinde yönetir. WebSocket mesajları
+`requestAnimationFrame` ile aynı ekran karesinde toplu uygulanır ve tablo en
+fazla 200 DOM satırı gösterir.
+
+MapLibre GL JS yeniden kontrollü deney modu olarak eklenmiştir. Leaflet hâlâ
+varsayılan harita motorudur; kullanıcı arayüzündeki harita motoru toggle'ı ile
+MapLibre deney görünümüne geçilebilir. MapLibre component'i lazy-load edilir,
+yani büyük WebGL harita paketi ilk sayfa açılışında yüklenmez. Deney modu
+base map, pan/zoom, düz harita/küre projection geçişi ve canlı uçakları WebGL
+circle layer olarak çizme davranışını doğrular. Uçak sembolleri ve geçmiş rota
+çizimi henüz Leaflet üzerinde çalışır; sonraki adımda MapLibre symbol/line
+layer'larına taşınacaktır.
+
+Uçak renkleri irtifa aralıklarına göre yüksek kontrastlı seçilmiştir ve
+harita üzerinde metre aralıklarını gösteren bir renk efsanesi bulunur. Uçağa
+tıklandığında frontend `raw_positions` tabanlı history endpoint'inden son
+kayıtları alır ve seçili uçağın geçmiş rotasını harita üzerinde çizer. Rota
+çizgisi kesikli değildir; küçük segmentlere ayrılır ve her segment uçağın o
+noktadaki irtifa aralığına göre renklendirilir.
+
+Canlı ekranda yalnızca son 10 dakika içinde gözlenen uçaklar gösterilir.
+`live_positions` hâlâ uçak başına son bilinen durumu saklar; fakat daha eski
+kayıtlar harita ve canlı listeden gizlenir. Bu kayıtlar raw veri değildir,
+yalnızca artık canlı kabul edilmeyen son bilinen konumlardır. Uçak geçmişi
+sorguları `raw_positions` üzerinden yapılmaya devam eder.
+
+Producer şu anda OpenSky'dan Türkiye ve yakın çevresi için
+`35.00–43.50` enlem, `25.00–46.00` boylam kutusunu sorgular. Harita dünya
+üzerinde hareket edebilir; fakat bu veri toplama kutusunun dışında canlı uçak
+görülmez. Çağrı aralığı 30 saniyedir. Bu geniş kutu OpenSky kredi tüketimini
+artırır; anonim veya standart hesapta `429 Too Many Requests` görülmesi
+normaldir.
+
+Frontend veri akışı:
+
+1. Sayfa açıldığında `GET /api/aircraft` ile MongoDB snapshot alınır.
+2. `/ws/aircraft` bağlantısı kurulur.
+3. Bağlantı açıldıktan sonra arada kaçan veri ihtimaline karşı REST snapshot yenilenir.
+4. Yeni Kafka olayları toplu biçimde harita ve tabloya uygulanır.
+5. WebSocket koparsa artan bekleme süresiyle yeniden bağlanılır ve REST ile tekrar eşitlenir.
+
+Harita, yerel eğitimde API anahtarı gerektirmeyen OpenStreetMap raster tile
+katmanını kullanır. Public tile servisi production SLA sunmadığı için production
+ortamında kullanım politikası, destek ve erişilebilirlik gereksinimine uygun
+bir tile sağlayıcısı veya self-hosted çözüm seçilmelidir.
 
 ## Offset ve çökme dayanıklılığı
 
@@ -168,10 +250,24 @@ Bu tasarım veri kaybetmemeyi duplicate riskinden daha öncelikli tutan **at-lea
 | `KAFKA_REALTIME_CONSUMER_GROUP` | `flight-realtime-gateway-v1` | aynı | FastAPI WebSocket consumer offset kimliği |
 | `MONGODB_URI` | `mongodb://localhost:27017` | `mongodb://mongodb:27017` | MongoDB bağlantısı |
 | `MONGODB_DATABASE` | `flightdb` | aynı | Database adı |
-| `POLL_INTERVAL_SECONDS` | `300` | `300` | OpenSky çağrı aralığı |
+| `OPENSKY_AREA_MODE` | `turkey` | `.env` veya `turkey` | `turkey` veya `global` veri alanı |
+| `POLL_INTERVAL_SECONDS` | `30` | `30` | OpenSky çağrı aralığı |
 | `MAX_POLLS` | `0` | `0` | `0`, producer'ın sürekli çalışmasıdır |
+| `OPENSKY_CLIENT_ID` | boş | host `.env` değerinden | OpenSky OAuth API client kimliği |
+| `OPENSKY_CLIENT_SECRET` | boş | host `.env` değerinden | OpenSky OAuth API client secret değeri |
 
-`localhost`, program Mac üzerinde çalışırken kullanılır. Docker container içindeki servisler birbirlerine Compose servis adlarıyla ulaşır: `kafka` ve `mongodb`. `KAFKA_REALTIME_CONSUMER_GROUP` backend aşamasında kullanılacak planlı değişkendir.
+`localhost`, program Mac üzerinde çalışırken kullanılır. Docker container içindeki servisler birbirlerine Compose servis adlarıyla ulaşır: `kafka` ve `mongodb`.
+
+OpenSky credential'ları repo'ya yazılmamalıdır. Kayıtlı kullanım için
+`.env.example` dosyasını örnek alarak local `.env` dosyası oluştur:
+
+```bash
+cp .env.example .env
+```
+
+Ardından `.env` içindeki `OPENSKY_CLIENT_ID` ve `OPENSKY_CLIENT_SECRET`
+değerlerini doldur. `.env` ve `.env.*` dosyaları `.gitignore` ve
+`.dockerignore` içinde gizli dosya olarak korunur.
 
 ## Temel komutlar
 
@@ -193,10 +289,24 @@ Servis durumlarını göster:
 docker compose ps -a
 ```
 
-Producer ve consumer loglarını izle:
+Uygulama servislerinin loglarını izle:
 
 ```bash
-docker compose logs -f producer consumer
+docker compose logs -f producer consumer backend frontend
+```
+
+Backend sağlık ve REST cevaplarını kontrol et:
+
+```bash
+curl http://localhost:8000/health
+curl 'http://localhost:8000/api/aircraft?limit=5'
+curl http://localhost:8000/api/stats
+```
+
+Frontend'i aç:
+
+```text
+http://127.0.0.1:5173
 ```
 
 Sistemi durdur:
@@ -221,20 +331,44 @@ docker compose down
 
 ## OpenSky producer
 
-Producer İstanbul ve çevresi için aşağıdaki bounding box ile veri alır:
+Producer iki veri alanı modunu destekler:
+
+- `OPENSKY_AREA_MODE=turkey`: Türkiye ve yakın çevresi için bounding box kullanır.
+- `OPENSKY_AREA_MODE=global`: Bounding box göndermeden tüm dünyayı sorgular.
+
+Varsayılan mod `turkey` olarak bırakılmıştır. Bunun nedeni yanlışlıkla global
+modda sürekli çalışıp OpenSky kredisini hızlı tüketmemektir.
+
+Türkiye ve yakın çevresi modu aşağıdaki bounding box ile veri alır:
 
 ```python
 {
-    "lamin": 40.50,
-    "lomin": 27.50,
-    "lamax": 42.00,
-    "lomax": 30.00,
+    "lamin": 35.00,
+    "lomin": 25.00,
+    "lamax": 43.50,
+    "lomax": 46.00,
 }
 ```
 
 Her geçerli uçak ayrı Kafka mesajı olur. Kafka message key olarak `icao24` kullanılır. Aynı uçağın mesajlarının aynı partition'a yönlenebilmesi ve sırasının korunabilmesi için key önemlidir.
 
-Anonim API kotasını kontrollü kullanmak için varsayılan çağrı aralığı 300 saniyedir.
+Çağrı aralığı 30 saniyedir. Türkiye ve yakın çevresi kutusu yaklaşık 178.5
+sq° alan tuttuğu için OpenSky `/states/all` kredi tablosunda istek başına
+yaklaşık 3 kredi sınıfına girer. 30 saniyede bir tüm gün çalıştırmak yaklaşık
+8640 kredi/gün tüketir; anonim kota için sürdürülebilir değildir. Producer 429
+aldığında OpenSky'nin `X-Rate-Limit-Retry-After-Seconds` header'ına göre bekler.
+
+Global modda bounding box gönderilmediği için tüm dünya istenir. Bu daha fazla
+veri getirir ve `/states/all` kredi tablosunda istek başına en yüksek maliyet
+sınıfına yaklaşır. Standart kayıtlı kullanıcı kotasıyla global mod için 30
+saniye aralık tüm gün sürdürülebilir değildir; `90` veya `120` saniye daha
+güvenli bir başlangıç aralığıdır.
+
+OpenSky kayıtlı kullanıcı credential'ları verilirse producer OAuth2 client
+credentials akışıyla access token alır ve `/states/all` isteklerini `Bearer`
+token ile yapar. Token bellekte tutulur ve süresi yaklaşınca yenilenir; token,
+client secret veya benzeri gizli değerler loglanmaz. Credential yoksa producer
+anonim modda çalışmaya devam eder.
 
 ## Geliştirme yaklaşımı
 
@@ -250,9 +384,9 @@ Her özellik şu döngüyle geliştirilir:
 
 Codex için ayrıntılı çalışma kuralları ve güncel proje bağlamı [`AGENTS.md`](AGENTS.md) dosyasındadır.
 
-## Yakın hedef
+## Doğrulanan kilometre taşları
 
-Bir sonraki çalışan kilometre taşı:
+Kalıcı veri akışı:
 
 ```text
 docker compose up -d --build
@@ -266,7 +400,7 @@ Consumer MongoDB'ye yazıyor
 raw_positions ve live_positions doluyor
 ```
 
-Bu kilometre taşı doğrulandı. Sıradaki çalışan hedef:
+FastAPI veri erişimi ve gerçek zamanlı yayın:
 
 ```text
 Frontend ilk açılışı / yeniden bağlantı
@@ -283,3 +417,23 @@ Uçak geçmişi isteği
         ↓
 FastAPI REST → MongoDB raw_positions
 ```
+
+İki Kafka consumer group'unda da aynı log sonu offsetine ulaşılıp lag değerinin `0` olduğu ve gerçek OpenSky mesajının WebSocket istemcisine ulaştığı doğrulandı.
+
+## Yakın hedef
+
+React frontend kilometre taşı da doğrulandı:
+
+```text
+Frontend açılıyor
+        ↓
+REST /api/aircraft ile snapshot
+        ↓
+Tablo + harita oluşturuluyor
+        ↓
+WebSocket /ws/aircraft ile canlı güncellemeler
+        ↓
+Bağlantı koparsa yeniden bağlan + REST ile eşitle
+```
+
+Sıradaki çalışan hedef, bozuk bir Kafka mesajının MongoDB writer consumer'ını aynı offsette kilitlemesini engelleyen sınırlı retry ve dead-letter topic akışıdır.

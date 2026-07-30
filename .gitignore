@@ -30,3 +30,7 @@ compose.yaml.bak
 .pytest_cache/
 .mypy_cache/
 .coverage
+
+# Frontend bağımlılıkları ve build çıktısı
+node_modules/
+frontend/dist/
