@@ -328,6 +328,16 @@ function App() {
           </Suspense>
         )}
 
+        <label className="search-field map-search-field">
+          <span className="sr-only">Uçak ara</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Uçuş, ICAO24 veya ülke ara"
+          />
+        </label>
+
         <section className="metrics map-metrics" aria-label="Canlı uçuş istatistikleri">
           <article>
             <span>Canlı</span>
@@ -367,16 +377,6 @@ function App() {
             <p className="eyebrow">Operasyon listesi</p>
             <h2>Uçaklar</h2>
           </div>
-
-          <label className="search-field">
-            <span className="sr-only">Uçak ara</span>
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Uçuş, ICAO24 veya ülke ara"
-            />
-          </label>
         </div>
 
         <AircraftTable

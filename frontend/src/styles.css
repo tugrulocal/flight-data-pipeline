@@ -399,7 +399,7 @@ button {
 .map-metrics {
   position: absolute;
   z-index: 6;
-  top: 118px;
+  top: 170px;
   right: 18px;
   width: min(312px, calc(100% - 36px));
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -443,6 +443,15 @@ button {
   font-size: 0.72rem;
   font-weight: 800;
   pointer-events: none;
+}
+
+.map-search-field {
+  position: absolute;
+  z-index: 7;
+  top: 118px;
+  right: 18px;
+  width: min(312px, calc(100% - 36px));
+  pointer-events: auto;
 }
 
 .table-panel {
@@ -857,6 +866,23 @@ button {
   color: #fff;
 }
 
+.map-search-field input {
+  height: 46px;
+  border-color: rgba(8, 20, 29, 0.32);
+  border-radius: 16px;
+  background: rgba(5, 14, 22, 0.8);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  backdrop-filter: blur(12px);
+}
+
+.map-search-field input::placeholder {
+  color: rgba(217, 237, 241, 0.64);
+  font-weight: 700;
+}
+
 .search-field input:focus {
   border-color: rgba(77, 227, 193, 0.65);
   box-shadow: 0 0 0 3px rgba(77, 227, 193, 0.08);
@@ -964,6 +990,12 @@ tbody tr:hover,
 }
 
 @media (max-width: 900px) {
+  .map-search-field {
+    top: 118px;
+    right: 12px;
+    width: min(312px, calc(100% - 24px));
+  }
+
   .map-metrics {
     top: auto;
     right: 12px;
@@ -999,6 +1031,15 @@ tbody tr:hover,
     display: none;
   }
 
+  .map-top-actions {
+    gap: 6px;
+  }
+
+  .map-theme-toggle button {
+    width: 34px;
+    height: 34px;
+  }
+
   .flight-map-stage > .map-engine-switch {
     top: 86px;
     left: 10px;
@@ -1008,6 +1049,13 @@ tbody tr:hover,
 
   .map-metrics {
     display: none;
+  }
+
+  .map-search-field {
+    top: 138px;
+    right: 10px;
+    left: 10px;
+    width: auto;
   }
 
   .table-panel {
