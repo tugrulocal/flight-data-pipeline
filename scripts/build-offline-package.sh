@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-: "${VERSION:?VERSION gerekli (örnek: v1.0.0-rc.1)}"
+: "${VERSION:?VERSION gerekli (örnek: v1.0.0-rc.2)}"
 : "${PLATFORM:?PLATFORM gerekli (amd64 veya arm64)}"
 case "$PLATFORM" in amd64|arm64) ;; *) exit 2 ;; esac
 echo "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || {
@@ -25,8 +25,8 @@ ${prefix}-producer:${version_number}
 ${prefix}-consumer:${version_number}
 ${prefix}-backend:${version_number}
 ${prefix}-frontend:${version_number}
-apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
-mongo:8.0.28@sha256:98605bfa1bb2a15dd82109e1d78ad31527a9a744909fab4606076fa71a0ae515
+apache/kafka-native:4.3.1@sha256:2885898ba17065023f1bd605f3a81efcfa986014f062b73b91ef5462485f9060
+mongodb/mongodb-community-server:8.0.28-ubi9-slim@sha256:905f93fe770819a134dd8f74e14caf319735d068da86ff9c2e7c80dec140f191
 "
 
 output_dir=${OUTPUT_DIR:-release-out}
@@ -44,7 +44,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-mkdir -p "$stage/scripts" "$stage/kafka" "$stage/docs"
+mkdir -p "$stage/scripts" "$stage/docs"
 if [ "${OFFLINE_SKIP_PULL:-0}" != "1" ]; then
   for image in $images; do
     docker pull --platform "linux/$PLATFORM" "$image"
@@ -59,12 +59,11 @@ done
 docker save $images | gzip -9 > "$stage/offline-images-${PLATFORM}.tar.gz"
 
 bundle="$output_dir/flight-data-pipeline-${version_number}-${PLATFORM}.tar.gz"
-cp compose.yaml compose.global.yaml .env.example README.md SECURITY.md THIRD_PARTY_NOTICES.md "$stage/"
-cp kafka/init-topics.sh "$stage/kafka/"
+cp compose.yaml .env.example README.md SECURITY.md THIRD_PARTY_NOTICES.md "$stage/"
 cp scripts/setup.sh scripts/setup.ps1 scripts/backup-mongodb.sh scripts/restore-mongodb.sh "$stage/scripts/"
 cp docs/operations.md docs/global-mode.md docs/backup-restore.md docs/release.md docs/release-acceptance.md "$stage/docs/"
 for versioned_file in "$stage/compose.yaml" "$stage/.env.example"; do
-  sed "s/1.0.0-rc.1/${version_number}/g" "$versioned_file" > "${versioned_file}.tmp"
+  sed "s/1.0.0-rc.2/${version_number}/g" "$versioned_file" > "${versioned_file}.tmp"
   mv "${versioned_file}.tmp" "$versioned_file"
 done
 
@@ -72,9 +71,8 @@ done
   cd "$stage"
   for packaged_file in \
     "offline-images-${PLATFORM}.tar.gz" \
-    compose.yaml compose.global.yaml .env.example \
-    scripts/setup.sh scripts/setup.ps1 \
-    kafka/init-topics.sh
+    compose.yaml .env.example \
+    scripts/setup.sh scripts/setup.ps1
   do
     checksum_file "$packaged_file"
   done > SHA256SUMS.txt

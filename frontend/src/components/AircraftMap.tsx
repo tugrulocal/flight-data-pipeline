@@ -4,16 +4,19 @@ import {
   useRef,
 } from "react";
 import L from "leaflet";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 import type { Aircraft } from "../types";
 import { aircraftPopupHtml } from "../lib/aircraftPopup";
 import { altitudeColor } from "../lib/altitudeColors";
-import { AltitudeLegend } from "./MapOverlays";
+import { AltitudeLegend, RouteStatusOverlay } from "./MapOverlays";
 import type { RouteStatus } from "./MapOverlays";
 
 
-const INITIAL_CENTER: L.LatLngExpression = [39.0, 35.5];
-const INITIAL_ZOOM = 6;
+const INITIAL_CENTER: L.LatLngExpression = [20.0, 0.0];
+const INITIAL_ZOOM = 2;
 const MIN_ZOOM = 2;
 const MAX_ZOOM = 16;
 const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -73,7 +76,7 @@ export function AircraftMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapShellRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const markerLayerRef = useRef<L.MarkerClusterGroup | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const onSelectAircraftRef = useRef(onSelectAircraft);
 
@@ -128,7 +131,13 @@ export function AircraftMap({
     }).addTo(map);
 
     const routeLayer = L.layerGroup().addTo(map);
-    const markerLayer = L.layerGroup().addTo(map);
+    const markerLayer = L.markerClusterGroup({
+      chunkedLoading: true,
+      disableClusteringAtZoom: 8,
+      maxClusterRadius: 48,
+      removeOutsideVisibleBounds: true,
+      showCoverageOnHover: false,
+    }).addTo(map);
     mapRef.current = map;
     markerLayerRef.current = markerLayer;
     routeLayerRef.current = routeLayer;
@@ -260,6 +269,11 @@ export function AircraftMap({
     >
       <div ref={containerRef} className="leaflet-map" />
 
+      <RouteStatusOverlay
+        selectedAircraft={selectedAircraft}
+        selectedRoute={selectedRoute}
+        routeStatus={routeStatus}
+      />
       <AltitudeLegend />
     </div>
   );

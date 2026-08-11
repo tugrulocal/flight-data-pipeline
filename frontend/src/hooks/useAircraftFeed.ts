@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Aircraft,
   AircraftListResponse,
+  AircraftStatsResponse,
   ConnectionStatus,
   HealthResponse,
   RealtimeMessage,
@@ -10,8 +11,9 @@ import type {
 
 
 const MAX_RECONNECT_DELAY_MS = 15_000;
-const SNAPSHOT_AIRCRAFT_LIMIT = 20_000;
-const DEFAULT_LIVE_WINDOW_MINUTES = 10;
+export const SNAPSHOT_AIRCRAFT_LIMIT = 50_000;
+const DEFAULT_LIVE_WINDOW_MINUTES = 20;
+const STATS_REFRESH_INTERVAL_MS = 30_000;
 
 
 export function isRecentlyObserved(
@@ -92,6 +94,8 @@ export function useAircraftFeed() {
   const [liveWindowMinutes, setLiveWindowMinutes] =
     useState(DEFAULT_LIVE_WINDOW_MINUTES);
   const [snapshotTruncated, setSnapshotTruncated] = useState(false);
+  const [statistics, setStatistics] =
+    useState<AircraftStatsResponse | null>(null);
 
   const aircraftByIdRef = useRef(new Map<string, Aircraft>());
   const pendingUpdatesRef = useRef(new Map<string, Aircraft>());
@@ -146,9 +150,10 @@ export function useAircraftFeed() {
     }
 
     try {
-      const [aircraftResponse, healthResponse] = await Promise.all([
+      const [aircraftResponse, healthResponse, statisticsResponse] = await Promise.all([
         fetch(`/api/aircraft?limit=${SNAPSHOT_AIRCRAFT_LIMIT}`),
         fetch("/health"),
+        fetch("/api/stats"),
       ]);
 
       if (!aircraftResponse.ok) {
@@ -184,6 +189,12 @@ export function useAircraftFeed() {
       setSnapshotTruncated(Boolean(snapshot.truncated));
       setError(null);
 
+      if (statisticsResponse.ok) {
+        setStatistics(
+          await statisticsResponse.json() as AircraftStatsResponse,
+        );
+      }
+
       if (healthResponse.ok) {
         setBackendHealth(
           await healthResponse.json() as HealthResponse,
@@ -207,6 +218,26 @@ export function useAircraftFeed() {
       }
     }
   }, [scheduleUpdateFlush]);
+
+  useEffect(() => {
+    const refreshStatistics = async () => {
+      try {
+        const response = await fetch("/api/stats");
+        if (response.ok && mountedRef.current) {
+          setStatistics(await response.json() as AircraftStatsResponse);
+        }
+      } catch {
+        // Snapshot sırasında alınan son tutarlı sayaç korunur.
+      }
+    };
+
+    const intervalId = window.setInterval(
+      () => void refreshStatistics(),
+      STATS_REFRESH_INTERVAL_MS,
+    );
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -335,6 +366,7 @@ export function useAircraftFeed() {
     lastSnapshotAt,
     liveWindowMinutes,
     snapshotTruncated,
+    statistics,
     refreshSnapshot,
   };
 }

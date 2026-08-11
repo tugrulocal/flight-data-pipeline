@@ -1,4 +1,18 @@
-FROM python:3.13.14-slim@sha256:bf503bb2243c5aad0aa951544dd60d165f992646441d35dea90893703fc26251
+FROM python:3.13.14-alpine3.23@sha256:9fdbf2e3e82628351513560b121e2ee6ce31cac212be9e070c5a5e2769fb5e76 AS wheel-builder
+
+WORKDIR /build
+
+COPY requirements-build.txt ./requirements-build.txt
+COPY backend/requirements.txt ./requirements.txt
+
+RUN apk add --no-cache gcc musl-dev librdkafka-dev=2.12.1-r0 \
+    && pip install --disable-pip-version-check --root-user-action=ignore \
+        --no-cache-dir --require-hashes -r requirements-build.txt \
+    && pip wheel --disable-pip-version-check --no-cache-dir \
+        --no-build-isolation --require-hashes -r requirements.txt \
+        --wheel-dir /wheels
+
+FROM python:3.13.14-alpine3.23@sha256:9fdbf2e3e82628351513560b121e2ee6ce31cac212be9e070c5a5e2769fb5e76
 
 ARG APP_VERSION=dev
 ARG VCS_REF=unknown
@@ -14,8 +28,12 @@ WORKDIR /app
 
 COPY backend/requirements.txt ./requirements.txt
 
-RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
-    && useradd --create-home --uid 10001 appuser
+RUN --mount=type=bind,from=wheel-builder,source=/wheels,target=/wheels \
+    apk add --no-cache librdkafka=2.12.1-r0 \
+    && pip install --disable-pip-version-check --root-user-action=ignore \
+        --no-cache-dir --no-index --no-deps /wheels/*.whl \
+    && addgroup -g 10001 appgroup \
+    && adduser -D -u 10001 -G appgroup appuser
 
 COPY --chown=appuser:appuser backend/app ./app
 COPY --chown=appuser:appuser flight_common ./flight_common

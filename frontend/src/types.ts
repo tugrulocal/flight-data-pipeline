@@ -32,6 +32,14 @@ export interface AircraftHistoryResponse {
   items: Aircraft[];
 }
 
+export interface AircraftStatsResponse {
+  total_aircraft: number;
+  airborne: number;
+  on_ground: number;
+  unknown_ground_state: number;
+  last_observed_at: string | null;
+}
+
 export interface HealthResponse {
     status: "ok" | "degraded";
     version: string;

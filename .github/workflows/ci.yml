@@ -35,6 +35,7 @@ jobs:
       - name: Python dependency audit
         run: |
           python -m pip install pip-audit
+          pip-audit -r requirements-build.txt
           pip-audit -r producer/requirements.txt
           pip-audit -r consumer/requirements.txt
           pip-audit -r backend/requirements.txt
@@ -58,7 +59,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
 
-  compose-and-images:
+  compose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,56 +67,114 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.dev.yaml config --quiet
-      - name: Uygulama image'larını oluştur
-        run: docker compose -f compose.yaml -f compose.dev.yaml build producer consumer backend frontend
-      - name: Production image içeriğini doğrula
+
+  multiarch-images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Platform image'larını oluştur
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-producer:1.0.0-rc.1 -c 'test ! -e /app/mock_producer.py && test ! -d /app/tests'
-          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-consumer:1.0.0-rc.1 -c 'test ! -d /app/tests'
-          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-backend:1.0.0-rc.1 -c 'test ! -d /app/tests'
-      - name: Image zafiyet taraması
-        uses: aquasecurity/trivy-action@0.33.1
+          for service in producer consumer backend frontend; do
+            docker buildx build \
+              --platform "linux/$PLATFORM" \
+              --file "$service/Dockerfile" \
+              --tag "flight-data-pipeline-$service:ci-$PLATFORM" \
+              --load \
+              .
+          done
+      - name: Production image içeriğini doğrula
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm --platform "linux/$PLATFORM" --entrypoint sh flight-data-pipeline-producer:ci-$PLATFORM -c 'test ! -e /app/mock_producer.py && test ! -d /app/tests && ! command -v gcc && python -c "import confluent_kafka; assert confluent_kafka.version() == \"2.12.1\"; assert confluent_kafka.libversion()[0] == \"2.12.1\""'
+          docker run --rm --platform "linux/$PLATFORM" --entrypoint sh flight-data-pipeline-consumer:ci-$PLATFORM -c 'test ! -d /app/tests && ! command -v gcc && python -c "import confluent_kafka; assert confluent_kafka.version() == \"2.12.1\"; assert confluent_kafka.libversion()[0] == \"2.12.1\""'
+          docker run --rm --platform "linux/$PLATFORM" --entrypoint sh flight-data-pipeline-backend:ci-$PLATFORM -c 'test ! -d /app/tests && ! command -v gcc && python -c "import confluent_kafka; assert confluent_kafka.version() == \"2.12.1\"; assert confluent_kafka.libversion()[0] == \"2.12.1\""'
+      - name: Backend image zafiyet taraması
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-backend:1.0.0-rc.1
+          image-ref: flight-data-pipeline-backend:ci-${{ matrix.platform }}
+          version: v0.72.0
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
       - name: Producer image zafiyet taraması
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-producer:1.0.0-rc.1
+          image-ref: flight-data-pipeline-producer:ci-${{ matrix.platform }}
+          version: v0.72.0
+          skip-setup-trivy: true
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
       - name: Consumer image zafiyet taraması
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-consumer:1.0.0-rc.1
+          image-ref: flight-data-pipeline-consumer:ci-${{ matrix.platform }}
+          version: v0.72.0
+          skip-setup-trivy: true
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
       - name: Frontend image zafiyet taraması
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-frontend:1.0.0-rc.1
+          image-ref: flight-data-pipeline-frontend:ci-${{ matrix.platform }}
+          version: v0.72.0
+          skip-setup-trivy: true
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
+
+  official-images:
+    if: ${{ inputs.release_gate == true }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [amd64, arm64]
+    steps:
       - name: Kafka image zafiyet taraması
-        if: ${{ inputs.release_gate == true }}
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+          image-ref: apache/kafka-native:4.3.1@sha256:2885898ba17065023f1bd605f3a81efcfa986014f062b73b91ef5462485f9060
+          version: v0.72.0
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
       - name: MongoDB image zafiyet taraması
-        if: ${{ inputs.release_gate == true }}
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.platform }}
         with:
-          image-ref: mongo:8.0.28@sha256:98605bfa1bb2a15dd82109e1d78ad31527a9a744909fab4606076fa71a0ae515
+          image-ref: mongodb/mongodb-community-server:8.0.28-ubi9-slim@sha256:905f93fe770819a134dd8f74e14caf319735d068da86ff9c2e7c80dec140f191
+          version: v0.72.0
+          skip-setup-trivy: true
+          scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: true
+          ignore-unfixed: false
           exit-code: "1"
 
   integration:

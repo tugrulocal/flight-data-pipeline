@@ -20,7 +20,7 @@ import {
   altitudeBucketKey,
   altitudeColor,
 } from "../lib/altitudeColors";
-import { AltitudeLegend } from "./MapOverlays";
+import { AltitudeLegend, RouteStatusOverlay } from "./MapOverlays";
 import type { RouteStatus } from "./MapOverlays";
 
 
@@ -31,8 +31,8 @@ maplibregl.setWorkerUrl(mapLibreWorkerUrl);
 /*  Sabitler                                                          */
 /* ------------------------------------------------------------------ */
 
-const INITIAL_CENTER: [number, number] = [28.0, 20.0];
-const MERCATOR_ZOOM = 2.5;
+const INITIAL_CENTER: [number, number] = [0.0, 20.0];
+const MERCATOR_ZOOM = 2.0;
 const GLOBE_ZOOM = 1.8;
 
 export type MapTheme = "light" | "dark";
@@ -949,6 +949,11 @@ export function MapLibreMap({
         </button>
       </div>
 
+      <RouteStatusOverlay
+        selectedAircraft={selectedAircraft}
+        selectedRoute={selectedRoute}
+        routeStatus={routeStatus}
+      />
       <AltitudeLegend />
     </div>
   );

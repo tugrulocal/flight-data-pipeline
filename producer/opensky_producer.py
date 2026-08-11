@@ -24,6 +24,10 @@ DEFAULT_TOKEN_URL = (
 TOKEN_REFRESH_MARGIN_SECONDS = 60
 GLOBAL_WARNING_POLL_INTERVAL_SECONDS = 90
 GLOBAL_RECOMMENDED_POLL_INTERVAL_SECONDS = 120
+ANONYMOUS_MIN_POLL_INTERVAL_SECONDS = {
+    "turkey": 660,
+    "global": 900,
+}
 SUPPORTED_AREA_MODES = {"turkey", "global"}
 
 TURKEY_BOUNDING_BOX = {
@@ -65,7 +69,7 @@ class ProducerSettings:
 
 def load_settings(environ=None):
     values = os.environ if environ is None else environ
-    area_mode = values.get("OPENSKY_AREA_MODE", "turkey").strip().lower()
+    area_mode = values.get("OPENSKY_AREA_MODE", "global").strip().lower()
 
     if area_mode not in SUPPORTED_AREA_MODES:
         raise ValueError(
@@ -90,7 +94,7 @@ def load_settings(environ=None):
         ),
         poll_interval_seconds=parse_int(
             "POLL_INTERVAL_SECONDS",
-            values.get("POLL_INTERVAL_SECONDS", "30"),
+            values.get("POLL_INTERVAL_SECONDS", "120"),
             minimum=1,
         ),
         max_polls=parse_int(
@@ -102,6 +106,18 @@ def load_settings(environ=None):
         ),
         opensky_client_id=client_id,
         opensky_client_secret=client_secret,
+    )
+
+
+def get_effective_poll_interval(settings):
+    """Kimliksiz çağrıların günlük OpenSky kotasını tüketmesini sınırlar."""
+
+    if settings.has_credentials:
+        return settings.poll_interval_seconds
+
+    return max(
+        settings.poll_interval_seconds,
+        ANONYMOUS_MIN_POLL_INTERVAL_SECONDS[settings.area_mode],
     )
 
 
@@ -330,6 +346,7 @@ def run(settings, *, producer=None, opensky_client=None, stop_event=None):
     client = opensky_client or OpenSkyClient(settings)
     stopping = stop_event or threading.Event()
     poll_number = 0
+    effective_poll_interval = get_effective_poll_interval(settings)
 
     if stop_event is None:
         install_signal_handlers(stopping)
@@ -343,12 +360,14 @@ def run(settings, *, producer=None, opensky_client=None, stop_event=None):
             "poll_interval_seconds": settings.poll_interval_seconds,
             "max_polls": settings.max_polls,
             "authentication": "oauth" if settings.has_credentials else "anonymous",
+            "configured_poll_interval_seconds": settings.poll_interval_seconds,
+            "effective_poll_interval_seconds": effective_poll_interval,
         },
     )
 
     if (
         settings.area_mode == "global"
-        and settings.poll_interval_seconds < GLOBAL_WARNING_POLL_INTERVAL_SECONDS
+        and effective_poll_interval < GLOBAL_WARNING_POLL_INTERVAL_SECONDS
     ):
         logger.warning(
             "Global mod çağrı aralığı kotayı hızlı tüketebilir.",
@@ -384,7 +403,7 @@ def run(settings, *, producer=None, opensky_client=None, stop_event=None):
                 logger.error("Producer işlem hatası.", extra={"event": "processing_error", "error": str(error)})
 
             if settings.max_polls == 0 or poll_number < settings.max_polls:
-                stopping.wait(settings.poll_interval_seconds)
+                stopping.wait(effective_poll_interval)
     finally:
         remaining = kafka_producer.flush(10)
         client.close()

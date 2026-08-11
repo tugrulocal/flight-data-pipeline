@@ -1,6 +1,13 @@
 #!/bin/sh
 set -eu
 
+check_only=0
+case "${1:-}" in
+  "") ;;
+  --check-only) check_only=1 ;;
+  *) printf 'Kullanım: %s [--check-only]\n' "$0" >&2; exit 2 ;;
+esac
+
 MIN_DOCKER_MAJOR=24
 MIN_COMPOSE_MAJOR=2
 REQUIRED_MEMORY_BYTES=4294967296
@@ -17,6 +24,8 @@ cd "$project_root"
 command -v docker >/dev/null 2>&1 || fail "Docker bulunamadı. Docker Desktop/Engine kurulmalı."
 docker info >/dev/null 2>&1 || fail "Docker servisi çalışmıyor."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 bulunamadı."
+docker_os=$(docker info --format '{{.OSType}}' 2>/dev/null || true)
+[ "$docker_os" = "linux" ] || fail "Docker Linux container modunda çalışmalı. Windows'ta Docker Desktop WSL2 backend'ini açın."
 
 docker_major=$(docker version --format '{{.Server.Version}}' | cut -d. -f1)
 compose_major=$(docker compose version --short | sed 's/^v//' | cut -d. -f1)
@@ -42,7 +51,7 @@ if [ ! -f .env ]; then
 fi
 
 app_port=$(sed -n 's/^APP_PORT=//p' .env | tail -n 1)
-app_port=${app_port:-5173}
+app_port=${app_port:-5175}
 case "$app_port" in
   ''|*[!0-9]*) fail "APP_PORT pozitif bir sayı olmalı." ;;
 esac
@@ -51,18 +60,19 @@ if [ "$app_port" -lt 1 ] || [ "$app_port" -gt 65535 ]; then
 fi
 
 area_mode=$(sed -n 's/^OPENSKY_AREA_MODE=//p' .env | tail -n 1)
-area_mode=${area_mode:-turkey}
+area_mode=${area_mode:-global}
 case "$area_mode" in
   turkey) ;;
   global) REQUIRED_DISK_GB=30 ;;
   *) fail "OPENSKY_AREA_MODE turkey veya global olmalı." ;;
 esac
 
-if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$app_port" -sTCP:LISTEN >/dev/null 2>&1; then
+existing_frontend=$(docker compose ps -q frontend 2>/dev/null || true)
+if [ -z "$existing_frontend" ] && command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$app_port" -sTCP:LISTEN >/dev/null 2>&1; then
   fail "127.0.0.1:${app_port} kullanımda."
-elif command -v ss >/dev/null 2>&1 && ss -ltn | awk '{print $4}' | grep -Eq "(^|:)${app_port}$"; then
+elif [ -z "$existing_frontend" ] && command -v ss >/dev/null 2>&1 && ss -ltn | awk '{print $4}' | grep -Eq "(^|:)${app_port}$"; then
   fail "127.0.0.1:${app_port} kullanımda."
-elif docker ps --format '{{.Ports}}' | grep -Eq "(^|[^0-9])${app_port}->|:${app_port}->"; then
+elif [ -z "$existing_frontend" ] && docker ps --format '{{.Ports}}' | grep -Eq "(^|[^0-9])${app_port}->|:${app_port}->"; then
   fail "127.0.0.1:${app_port} başka bir container tarafından kullanılıyor."
 fi
 
@@ -90,4 +100,22 @@ fi
 docker compose config --quiet || fail "Compose yapılandırması geçersiz."
 
 printf 'Kontroller başarılı: mimari=%s, port=%s, gereken_disk=%sGB\n' "$platform" "$app_port" "$REQUIRED_DISK_GB"
-printf 'Başlatmak için: docker compose up -d\n'
+
+if [ "$check_only" = "1" ]; then
+  printf 'Yalnız kontrol modu tamamlandı; servisler başlatılmadı.\n'
+  exit 0
+fi
+
+if [ ! -f "$offline_archive" ]; then
+  printf "Sürümlü image'lar registry'den indiriliyor...\n"
+  docker compose pull || fail "Image'lar indirilemedi."
+fi
+
+printf 'Servisler başlatılıyor...\n'
+docker compose up -d --wait --wait-timeout 240 || fail "Servisler sağlıklı başlayamadı."
+
+docker compose exec -T frontend \
+  wget --quiet --tries=1 --spider http://127.0.0.1/health \
+  || fail "Uygulama health kontrolü başarısız."
+
+printf 'Uygulama hazır: http://127.0.0.1:%s\n' "$app_port"

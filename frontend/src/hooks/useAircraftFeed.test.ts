@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import type { Aircraft } from "../types";
 import {
+  SNAPSHOT_AIRCRAFT_LIMIT,
   isNewerAircraftUpdate,
   isRecentlyObserved,
   mergeAircraftUpdate,
 } from "./useAircraftFeed";
+
+
+describe("global snapshot", () => {
+  it("dünya trafiği için 50 bin uçaklık üst sınır kullanır", () => {
+    expect(SNAPSHOT_AIRCRAFT_LIMIT).toBe(50_000);
+  });
+});
 
 
 function aircraft(

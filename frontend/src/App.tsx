@@ -92,6 +92,7 @@ function App() {
     liveWindowMinutes,
     refreshSnapshot,
     snapshotTruncated,
+    statistics: serverStatistics,
   } = useAircraftFeed();
   const [search, setSearch] = useState("");
   const [selectedIcao24, setSelectedIcao24] =
@@ -243,7 +244,7 @@ function App() {
     [liveAircraft, selectedIcao24],
   );
 
-  const statistics = useMemo(() => {
+  const snapshotStatistics = useMemo(() => {
     let airborne = 0;
     let onGround = 0;
     let unknown = 0;
@@ -265,6 +266,15 @@ function App() {
       unknown,
     };
   }, [liveAircraft]);
+
+  const statistics = serverStatistics
+    ? {
+        total: serverStatistics.total_aircraft,
+        airborne: serverStatistics.airborne,
+        onGround: serverStatistics.on_ground,
+        unknown: serverStatistics.unknown_ground_state,
+      }
+    : snapshotStatistics;
 
   const statusText = {
     connecting: "Bağlanıyor",

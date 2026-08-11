@@ -16,19 +16,17 @@ MongoDB yazıcısı ve realtime gateway farklı consumer group kullanır. Teslim
 
 Hedef bilgisayarda yalnız Docker Desktop/Engine ve Compose v2 gerekir. Python, Node.js, Kafka ve MongoDB kurulmaz.
 
-    ./scripts/setup.sh
-    # Gerekirse .env içine OpenSky bilgilerini yazın.
-    docker compose up -d
+    sh scripts/setup.sh
 
 Windows PowerShell:
 
-    ./scripts/setup.ps1
-    # Gerekirse .env içine OpenSky bilgilerini yazın.
-    docker compose up -d
+    powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
-Uygulama: http://127.0.0.1:5173
+Uygulama: http://127.0.0.1:5175
 
-Release Compose yalnız frontend portunu ve yalnız loopback arayüzünde açar. Backend, Kafka ve MongoDB host ağına açılmaz. Türkiye modu varsayılandır. OpenSky credentials yalnız yerel .env içine yazılır.
+Release Compose yalnız frontend portunu ve yalnız loopback arayüzünde açar. Backend, Kafka ve MongoDB host ağına açılmaz. Global mod varsayılandır. Credential girilmezse ilk OpenSky sorgusu hemen, sonraki anonim sorgular kotayı korumak için 15 dakikada bir yapılır. Credential değerleri yalnız yerel `.env` içine yazılır.
+
+Normal kapatma `docker compose down` komutudur; Kafka ve MongoDB volume'ları korunur. `down -v` veriyi siler ve normal kapatma için kullanılmamalıdır.
 
 GHCR image'ları release workflow'u tag çalıştırdıktan sonra public package olarak kullanılabilir. Yerel geliştirmede aşağıdaki override source'tan image oluşturur.
 
@@ -61,9 +59,9 @@ Frontend:
 ## Temel doğrulama
 
     docker compose ps -a
-    curl http://127.0.0.1:5173/health
-    curl 'http://127.0.0.1:5173/api/aircraft?limit=5'
-    curl http://127.0.0.1:5173/api/stats
+    curl http://127.0.0.1:5175/health
+    curl 'http://127.0.0.1:5175/api/aircraft?limit=5'
+    curl http://127.0.0.1:5175/api/stats
     docker compose logs --tail=50 producer consumer backend frontend
 
 GET /api/aircraft yalnız runtime LIVE_POSITION_WINDOW_MINUTES içindeki public uçak alanlarını döndürür; yanıtta window_minutes ve truncated bulunur. REST snapshot ile WebSocket aircraft.batch aynı uçak sözleşmesini kullanır.
@@ -76,13 +74,9 @@ MapLibre varsayılandır. WebGL yoksa, harita kurulamazsa veya context kaybolurs
 - Kafka DLQ: 30 gün veya 1 GiB.
 - MongoDB raw_positions: ingested_at üzerinden 48 saat TTL.
 - MongoDB live_positions: ingested_at üzerinden 7 gün TTL.
-- Kafka heap: 256–512 MiB; MongoDB WiredTiger cache: 512 MiB.
-- Türkiye: en az 4 GB Docker belleği ve 10 GB boş disk.
-- Global: en az 4 GB Docker belleği ve 30 GB boş disk; poll aralığı 120 saniye.
-
-Global profil:
-
-    docker compose -f compose.yaml -f compose.global.yaml up -d
+- Kafka native broker JVM heap ayarı gerektirmez; MongoDB WiredTiger cache: 512 MiB.
+- Global varsayılan: en az 4 GB Docker belleği ve 30 GB boş disk; OAuth ile yapılandırılan poll aralığı 120 saniye, anonim etkili aralık en az 900 saniyedir.
+- Türkiye seçeneği: `.env` içinde `OPENSKY_AREA_MODE=turkey`; en az 10 GB boş disk, anonim etkili aralık en az 660 saniyedir.
 
 ## Ayrıntılı dokümanlar
 

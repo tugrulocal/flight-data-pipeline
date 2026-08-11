@@ -4,8 +4,10 @@ import pytest
 
 from producer.opensky_producer import (
     DeliveryTracker,
+    get_effective_poll_interval,
     load_settings,
     normalize_state,
+    run,
     send_states_to_kafka,
 )
 
@@ -66,6 +68,34 @@ def test_settings_reject_invalid_numbers():
         load_settings({"POLL_INTERVAL_SECONDS": "0"})
 
 
+def test_global_defaults_and_anonymous_interval_protect_quota():
+    settings = load_settings({})
+
+    assert settings.area_mode == "global"
+    assert settings.poll_interval_seconds == 120
+    assert get_effective_poll_interval(settings) == 900
+
+
+def test_anonymous_turkey_interval_protects_quota():
+    settings = load_settings({
+        "OPENSKY_AREA_MODE": "turkey",
+        "POLL_INTERVAL_SECONDS": "30",
+    })
+
+    assert get_effective_poll_interval(settings) == 660
+
+
+def test_authenticated_global_interval_uses_configured_value():
+    settings = load_settings({
+        "OPENSKY_AREA_MODE": "global",
+        "POLL_INTERVAL_SECONDS": "120",
+        "OPENSKY_CLIENT_ID": "client-id",
+        "OPENSKY_CLIENT_SECRET": "client-secret",
+    })
+
+    assert get_effective_poll_interval(settings) == 120
+
+
 class FakeProducer:
     def __init__(self, delivery_error=None):
         self.delivery_error = delivery_error
@@ -83,6 +113,36 @@ class FakeProducer:
             callback(self.delivery_error, object())
         self.callbacks.clear()
         return 0
+
+
+def test_run_fetches_immediately_then_waits_effective_interval():
+    calls = []
+
+    class Client:
+        def fetch_states(self):
+            calls.append("fetch")
+            return 1_700_000_010, []
+
+        def close(self):
+            calls.append("close")
+
+    class StopEvent:
+        def is_set(self):
+            return False
+
+        def wait(self, seconds):
+            calls.append(("wait", seconds))
+            return False
+
+    settings = load_settings({"MAX_POLLS": "2"})
+    run(
+        settings,
+        producer=FakeProducer(),
+        opensky_client=Client(),
+        stop_event=StopEvent(),
+    )
+
+    assert calls[:3] == ["fetch", ("wait", 900), "fetch"]
 
 
 def test_delivery_failure_makes_poll_fail():

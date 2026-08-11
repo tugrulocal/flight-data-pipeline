@@ -250,7 +250,7 @@ async def health(request: Request):
 @app.get("/api/aircraft")
 async def list_aircraft(
     request: Request,
-    limit: int = Query(default=200, ge=1, le=20000),
+    limit: int = Query(default=200, ge=1, le=50000),
 ):
     observed_since = datetime.now(timezone.utc) - timedelta(
         minutes=settings.live_position_window_minutes

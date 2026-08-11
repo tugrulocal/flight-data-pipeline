@@ -6,7 +6,7 @@ fail() {
   exit 1
 }
 
-output=${1:-flightdb-$(date -u +%Y%m%dT%H%M%SZ).archive.gz}
+output=${1:-flightdb-$(date -u +%Y%m%dT%H%M%SZ).jsonl.gz}
 case "$output" in
   /*) ;;
   *) output="$PWD/$output" ;;
@@ -24,13 +24,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-docker compose exec -T mongodb mongodump \
-  --quiet \
-  --db flightdb \
-  --archive \
-  --gzip > "$temporary" || fail "mongodump başarısız; yarım arşiv silindi."
+docker compose run --rm --no-deps -T consumer \
+  python /app/mongodb_transfer.py export \
+  > "$temporary" || fail "MongoDB export başarısız; yarım arşiv silindi."
 
-[ -s "$temporary" ] || fail "mongodump boş arşiv üretti."
+[ -s "$temporary" ] || fail "MongoDB export boş arşiv üretti."
 mv "$temporary" "$output"
 trap - EXIT INT TERM
 

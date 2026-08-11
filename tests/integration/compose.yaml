@@ -2,7 +2,7 @@ name: flight-data-pipeline-integration
 
 services:
   kafka:
-    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    image: apache/kafka-native:4.3.1@sha256:2885898ba17065023f1bd605f3a81efcfa986014f062b73b91ef5462485f9060
     environment:
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
       KAFKA_NODE_ID: 1
@@ -20,13 +20,15 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 1000
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 29092"]
       interval: 3s
       timeout: 3s
       retries: 30
 
   topic-init:
-    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    build:
+      context: ../..
+      dockerfile: producer/Dockerfile
     depends_on:
       kafka:
         condition: service_healthy
@@ -36,15 +38,16 @@ services:
       KAFKA_RAW_RETENTION_BYTES: 10485760
       KAFKA_DLQ_RETENTION_MS: 60000
       KAFKA_DLQ_RETENTION_BYTES: 10485760
-    volumes:
-      - ../../kafka/init-topics.sh:/opt/flight/init-topics.sh:ro
-    entrypoint: ["/bin/sh", "/opt/flight/init-topics.sh"]
+    entrypoint: ["python", "/app/kafka_admin.py"]
+
+  kafka-tools:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    profiles: ["test-tools"]
 
   mongodb:
-    image: mongo:8.0.28@sha256:98605bfa1bb2a15dd82109e1d78ad31527a9a744909fab4606076fa71a0ae515
+    image: mongodb/mongodb-community-server:8.0.28-ubi9-slim@sha256:905f93fe770819a134dd8f74e14caf319735d068da86ff9c2e7c80dec140f191
     command:
       - mongod
-      - --bind_ip_all
       - --wiredTigerCacheSizeGB
       - "0.5"
       - --setParameter

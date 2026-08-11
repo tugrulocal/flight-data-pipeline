@@ -40,14 +40,14 @@ class Settings:
 def load_settings():
     """Backend ayarlarını ortam değişkenlerinden yükler."""
 
-    app_port = parse_positive_int(os.getenv("APP_PORT"), 5173)
+    app_port = parse_positive_int(os.getenv("APP_PORT"), 5175)
     default_cors_origins = (
         f"http://localhost:{app_port},"
         f"http://127.0.0.1:{app_port}"
     )
 
     return Settings(
-        app_version=os.getenv("APP_VERSION", "1.0.0-rc.1"),
+        app_version=os.getenv("APP_VERSION", "1.0.0-rc.2"),
         mongodb_uri=os.getenv(
             "MONGODB_URI",
             "mongodb://localhost:27017",
@@ -78,7 +78,7 @@ def load_settings():
         ),
         live_position_window_minutes=parse_positive_int(
             os.getenv("LIVE_POSITION_WINDOW_MINUTES"),
-            10,
+            20,
         ),
         cors_origins=parse_cors_origins(
             os.getenv("CORS_ORIGINS") or default_cors_origins

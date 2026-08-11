@@ -44,7 +44,7 @@ test.beforeEach(async ({ page }) => {
     contentType: "application/json",
     body: JSON.stringify({
       count: 2,
-      window_minutes: 10,
+      window_minutes: 20,
       truncated: false,
       items: [
         {
@@ -88,6 +88,16 @@ test.beforeEach(async ({ page }) => {
           kafka_offset: null,
         },
       ],
+    }),
+  }));
+  await page.route("**/api/stats", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      total_aircraft: 2,
+      airborne: 1,
+      on_ground: 0,
+      unknown_ground_state: 1,
+      last_observed_at: now,
     }),
   }));
   await page.route("**/health", (route) => route.fulfill({
@@ -184,7 +194,8 @@ test("tema seçili uçak ve rotayı korur; WebSocket yeniden bağlanır", async 
   await page.goto("/");
 
   await expect(page.getByText("Uyumluluk haritası aktif.")).toHaveCount(0);
-  await page.getByRole("button", { name: /THY123/ }).click();
+  await page.getByRole("button", { name: "Operasyonlar" }).click();
+  await page.getByRole("listitem").filter({ hasText: "THY123" }).click();
   await expect(page.getByText("2 nokta ile irtifa renkli rota")).toBeVisible();
   await expect(page.locator(".maplibregl-popup")).toBeVisible();
 
