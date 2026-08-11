@@ -21,15 +21,21 @@
   box-sizing: border-box;
 }
 
+#root {
+  height: 100%;
+}
+
 html {
   min-width: 320px;
+  height: 100%;
   background: var(--background);
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background:
     radial-gradient(circle at 20% -10%, rgba(33, 111, 128, 0.28), transparent 34rem),
     var(--background);
@@ -46,8 +52,8 @@ button {
 
 .app-shell {
   width: 100%;
-  margin: 0 auto;
-  padding: 10px 10px 28px;
+  height: 100dvh;
+  padding: 10px;
 }
 
 .topbar,
@@ -80,7 +86,19 @@ button {
 }
 
 .brand-mark::before,
-.brand-mark::after,
+.brand-mark::after {
+  display: none;
+}
+
+.brand-airplane-icon {
+  width: 45px;
+  height: 45px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: invert(77%) sepia(32%) saturate(794%) hue-rotate(115deg) brightness(96%) contrast(86%);
+  transform: rotate(-14deg);
+}
+
 .brand-mark span {
   position: absolute;
   display: block;
@@ -239,9 +257,12 @@ button {
 }
 
 .flight-map-stage {
+  --dashboard-panel-width: min(312px, calc(100% - 36px));
+  --operations-panel-width: var(--dashboard-panel-width);
   position: relative;
-  height: calc(100vh - 20px);
-  min-height: 720px;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
   padding: 0;
   overflow: hidden;
   border-radius: 22px;
@@ -256,7 +277,7 @@ button {
 
 .map-stage-head {
   position: absolute;
-  z-index: 6;
+  z-index: 1001;
   top: 18px;
   right: 18px;
   left: 18px;
@@ -283,6 +304,40 @@ button {
   background: rgba(5, 14, 22, 0.78);
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(12px);
+}
+
+.map-fallback-notice {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 84px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 193, 27, 0.52);
+  border-radius: 14px;
+  background: rgba(5, 14, 22, 0.88);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.map-fallback-notice button {
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: #ffc11b;
+  color: #17202a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.flight-state.unknown {
+  background: rgba(160, 174, 192, 0.16);
+  color: #7d8c9d;
 }
 
 .map-stage-head .brand {
@@ -388,7 +443,7 @@ button {
 
 .flight-map-stage > .map-engine-switch {
   position: absolute;
-  z-index: 7;
+  z-index: 1001;
   top: 98px;
   left: 18px;
   margin: 0;
@@ -396,22 +451,48 @@ button {
   backdrop-filter: blur(12px);
 }
 
-.map-metrics {
+.map-dashboard {
   position: absolute;
-  z-index: 6;
-  top: 170px;
+  z-index: 1001;
+  top: 82px;
   right: 18px;
-  width: min(312px, calc(100% - 36px));
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: var(--dashboard-panel-width);
+  display: grid;
   gap: 8px;
+}
+
+.map-metrics {
+  position: static;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   pointer-events: none;
 }
 
 .map-metrics article {
-  min-height: 70px;
+  min-height: 0;
   padding: 10px 11px;
   border-radius: 14px;
+}
+
+.map-metrics .flight-summary-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.flight-summary-card > div:nth-child(2) {
+  transform: translateX(-8px);
+}
+
+.flight-summary-card > div:nth-child(3) {
+  transform: translateX(-15px);
+}
+
+.flight-summary-card > div {
+  display: grid;
+  min-width: 0;
+  align-content: center;
 }
 
 .map-metrics span {
@@ -432,13 +513,10 @@ button {
 }
 
 .map-count-pill {
-  position: absolute;
-  z-index: 6;
-  right: 18px;
-  bottom: 78px;
-  max-width: min(520px, calc(100% - 36px));
+  position: static;
+  max-width: 100%;
   padding: 9px 12px;
-  border-radius: 999px;
+  border-radius: 13px;
   color: #d9edf1;
   font-size: 0.72rem;
   font-weight: 800;
@@ -446,12 +524,133 @@ button {
 }
 
 .map-search-field {
-  position: absolute;
-  z-index: 7;
-  top: 118px;
-  right: 18px;
-  width: min(312px, calc(100% - 36px));
+  position: relative;
+  width: 100%;
   pointer-events: auto;
+}
+
+.operations-drawer {
+  position: absolute;
+  z-index: 1002;
+  top: 0;
+  right: 0;
+  bottom: 82px;
+  width: var(--operations-panel-width);
+  pointer-events: none;
+}
+
+.operations-toggle {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 0;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  width: 52px;
+  min-height: 194px;
+  padding: 12px 8px;
+  border: 1px solid rgba(77, 227, 193, 0.32);
+  border-radius: 16px 0 0 16px;
+  background: rgba(5, 14, 22, 0.86);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+  color: #d9edf1;
+  cursor: pointer;
+  font-size: 0.63rem;
+  font-weight: 800;
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+  transform: translateY(-50%);
+  transition: right 260ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease;
+}
+
+.operations-toggle:hover {
+  background: rgba(16, 41, 54, 0.96);
+}
+
+.operations-takeoff-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: invert(77%) sepia(32%) saturate(794%) hue-rotate(115deg) brightness(96%) contrast(86%);
+}
+
+.operations-toggle span {
+  color: #eaf5f7;
+  letter-spacing: 0.12em;
+  text-orientation: upright;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
+
+.operations-panel {
+  position: absolute;
+  top: 218px;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(8, 20, 29, 0.32);
+  border-radius: 18px;
+  background: rgba(5, 14, 22, 0.88);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(100% + 18px));
+  backdrop-filter: blur(16px);
+  transition: transform 220ms ease, opacity 160ms ease;
+}
+
+.operations-drawer.is-open .operations-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.operations-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.operations-panel-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.05rem;
+  letter-spacing: -0.025em;
+}
+
+.operations-close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d9edf1;
+  cursor: pointer;
+}
+
+.operations-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.operations-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
 }
 
 .table-panel {
@@ -620,6 +819,11 @@ button {
   border-radius: 8px 0 0;
   background: rgba(255, 255, 255, 0.82);
   font-size: 0.65rem;
+}
+
+.map-shell .leaflet-control-attribution a {
+  color: #004662;
+  font-weight: 600;
 }
 
 .aircraft-leaflet-marker {
@@ -856,6 +1060,10 @@ button {
   width: min(360px, 100%);
 }
 
+.search-field.map-search-field {
+  width: 100%;
+}
+
 .search-field input {
   width: 100%;
   padding: 10px 13px;
@@ -868,6 +1076,8 @@ button {
 
 .map-search-field input {
   height: 46px;
+  padding-right: 13px;
+  padding-left: 42px;
   border-color: rgba(8, 20, 29, 0.32);
   border-radius: 16px;
   background: rgba(5, 14, 22, 0.8);
@@ -876,6 +1086,21 @@ button {
   font-size: 0.82rem;
   font-weight: 700;
   backdrop-filter: blur(12px);
+}
+
+.search-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: rgba(217, 237, 241, 0.72);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .map-search-field input::placeholder {
@@ -888,11 +1113,110 @@ button {
   box-shadow: 0 0 0 3px rgba(77, 227, 193, 0.08);
 }
 
-.table-scroll {
-  max-height: 530px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+.aircraft-list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(77, 227, 193, 0.72) rgba(255, 255, 255, 0.04);
+  scrollbar-width: thin;
+}
+
+.aircraft-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.aircraft-list::-webkit-scrollbar-track {
+  margin: 8px 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.aircraft-list::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 2px solid rgba(5, 14, 22, 0.88);
+  border-radius: 999px;
+  background: rgba(77, 227, 193, 0.7);
+}
+
+.aircraft-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.aircraft-list-item {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  padding: 13px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.aircraft-list-item:hover,
+.aircraft-list-item.selected-row {
+  background: rgba(77, 227, 193, 0.09);
+}
+
+.aircraft-list-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.aircraft-list-identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.aircraft-list-identity > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.takeoff-icon {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: invert(77%) sepia(32%) saturate(794%) hue-rotate(115deg) brightness(96%) contrast(86%);
+  transform: rotate(-14deg);
+}
+
+.aircraft-list-heading strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aircraft-list-heading small {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.64rem;
+}
+
+.aircraft-list-details {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.aircraft-list-details span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 table {
@@ -990,30 +1314,27 @@ tbody tr:hover,
 }
 
 @media (max-width: 900px) {
-  .map-search-field {
-    top: 118px;
-    right: 12px;
-    width: min(312px, calc(100% - 24px));
-  }
-
-  .map-metrics {
-    top: auto;
-    right: 12px;
-    bottom: 82px;
-    left: 12px;
-    width: auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .flight-map-stage {
-    height: 86vh;
-    min-height: 620px;
+    --dashboard-panel-width: min(312px, calc(100% - 24px));
+    height: 100%;
+    min-height: 0;
   }
+
+  .map-dashboard {
+    top: 82px;
+    right: 12px;
+    left: auto;
+  }
+
+  .operations-drawer {
+    right: 0;
+  }
+
 }
 
 @media (max-width: 620px) {
   .app-shell {
-    padding: 8px 8px 22px;
+    padding: 8px;
   }
 
   .map-stage-head {
@@ -1047,15 +1368,49 @@ tbody tr:hover,
     overflow-x: auto;
   }
 
-  .map-metrics {
-    display: none;
-  }
-
-  .map-search-field {
+  .map-dashboard {
     top: 138px;
     right: 10px;
     left: 10px;
     width: auto;
+  }
+
+  .flight-map-stage {
+    --dashboard-panel-width: calc(100% - 20px);
+  }
+
+  .operations-drawer {
+    right: 0;
+    bottom: 134px;
+  }
+
+  .operations-toggle {
+    width: 46px;
+    min-height: 164px;
+  }
+
+  .operations-panel {
+    top: 270px;
+  }
+
+  .map-metrics .flight-summary-card {
+    gap: 6px;
+  }
+
+  .map-metrics article {
+    padding: 9px 10px;
+  }
+
+  .map-metrics strong {
+    font-size: 1.15rem;
+  }
+
+  .flight-summary-card > div:nth-child(2) {
+    transform: translateX(-5px);
+  }
+
+  .flight-summary-card > div:nth-child(3) {
+    transform: translateX(-10px);
   }
 
   .table-panel {
@@ -1064,8 +1419,8 @@ tbody tr:hover,
   }
 
   .flight-map-stage {
-    height: 88vh;
-    min-height: 560px;
+    height: 100%;
+    min-height: 0;
     border-radius: 16px;
   }
 

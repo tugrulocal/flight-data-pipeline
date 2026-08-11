@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import (
     FastAPI,
@@ -19,15 +20,10 @@ from .config import load_settings
 from .database import MongoRepository
 from .kafka_gateway import KafkaRealtimeGateway
 from .websocket_manager import WebSocketManager
+from flight_common.logging import configure_json_logging
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=(
-        "%(asctime)s | %(levelname)s | "
-        "%(name)s | %(message)s"
-    ),
-)
+configure_json_logging("backend")
 logger = logging.getLogger(__name__)
 
 settings = load_settings()
@@ -49,7 +45,10 @@ async def lifespan(app):
     kafka_stop_event = asyncio.Event()
 
     await asyncio.to_thread(repository.ping)
-    logger.info("MongoDB bağlantısı başarılı.")
+    logger.info(
+        "MongoDB bağlantısı başarılı.",
+        extra={"event": "mongodb_connected"},
+    )
 
     kafka_task = asyncio.create_task(
         kafka_gateway.run(kafka_stop_event),
@@ -64,7 +63,10 @@ async def lifespan(app):
     try:
         yield
     finally:
-        logger.info("Backend bağlantıları kapatılıyor...")
+        logger.info(
+            "Backend bağlantıları kapatılıyor.",
+            extra={"event": "shutdown_started"},
+        )
         kafka_stop_event.set()
 
         try:
@@ -80,12 +82,15 @@ async def lifespan(app):
             )
 
         await asyncio.to_thread(repository.close)
-        logger.info("Backend kapatıldı.")
+        logger.info(
+            "Backend kapatıldı.",
+            extra={"event": "service_stopped"},
+        )
 
 
 app = FastAPI(
     title="Flight Data Pipeline API",
-    version="1.0.0",
+    version=settings.app_version,
     description=(
         "MongoDB uçuş durumunu REST ile, yeni Kafka "
         "olaylarını WebSocket ile sunar."
@@ -108,7 +113,10 @@ async def run_mongo(operation, *args):
     try:
         return await asyncio.to_thread(operation, *args)
     except PyMongoError as error:
-        logger.exception("MongoDB okuma hatası.")
+        logger.exception(
+            "MongoDB okuma hatası.",
+            extra={"event": "mongodb_read_error"},
+        )
         raise HTTPException(
             status_code=503,
             detail="MongoDB geçici olarak kullanılamıyor.",
@@ -140,7 +148,13 @@ async def health(request: Request):
         await asyncio.to_thread(repository.ping)
     except PyMongoError as error:
         mongo_status = "down"
-        logger.warning("Healthcheck MongoDB hatası: %s", error)
+        logger.warning(
+            "Healthcheck MongoDB hatası.",
+            extra={
+                "event": "health_mongodb_error",
+                "error": str(error),
+            },
+        )
 
     kafka_status = (
         "up"
@@ -149,8 +163,36 @@ async def health(request: Request):
     )
     healthy = mongo_status == "up" and kafka_status == "up"
 
+    latest_ingested_at = None
+    if mongo_status == "up":
+        try:
+            latest_ingested_at = await asyncio.to_thread(
+                repository.get_latest_ingested_at
+            )
+        except PyMongoError as error:
+            logger.warning(
+                "Veri tazeliği okunamadı.",
+                extra={
+                    "event": "freshness_read_error",
+                    "error": str(error),
+                },
+            )
+
+    age_seconds = None
+    if isinstance(latest_ingested_at, datetime):
+        age_seconds = max(
+            0,
+            int(
+                (
+                    datetime.now(timezone.utc)
+                    - latest_ingested_at.astimezone(timezone.utc)
+                ).total_seconds()
+            ),
+        )
+
     payload = {
         "status": "ok" if healthy else "degraded",
+        "version": settings.app_version,
         "components": {
             "mongodb": mongo_status,
             "kafka_realtime": kafka_status,
@@ -182,6 +224,21 @@ async def health(request: Request):
             .websocket_manager
             .connection_count
         ),
+        "data_freshness": {
+            "last_ingested_at": (
+                latest_ingested_at.isoformat()
+                if isinstance(latest_ingested_at, datetime)
+                else None
+            ),
+            "age_seconds": age_seconds,
+            "status": (
+                "empty"
+                if latest_ingested_at is None
+                else "fresh"
+                if age_seconds <= settings.live_position_window_minutes * 60
+                else "stale"
+            ),
+        },
     }
 
     return JSONResponse(
@@ -195,14 +252,20 @@ async def list_aircraft(
     request: Request,
     limit: int = Query(default=200, ge=1, le=20000),
 ):
-    aircraft = await run_mongo(
+    observed_since = datetime.now(timezone.utc) - timedelta(
+        minutes=settings.live_position_window_minutes
+    )
+    aircraft, truncated = await run_mongo(
         repository_from(request).list_live_aircraft,
         limit,
+        observed_since,
     )
 
     return {
         "count": len(aircraft),
         "items": aircraft,
+        "window_minutes": settings.live_position_window_minutes,
+        "truncated": truncated,
     }
 
 
@@ -254,8 +317,12 @@ async def aircraft_detail(
 
 @app.get("/api/stats")
 async def statistics(request: Request):
+    observed_since = datetime.now(timezone.utc) - timedelta(
+        minutes=settings.live_position_window_minutes
+    )
     return await run_mongo(
-        repository_from(request).get_live_statistics
+        repository_from(request).get_live_statistics,
+        observed_since,
     )
 
 
@@ -269,18 +336,16 @@ async def aircraft_websocket(websocket: WebSocket):
 
     manager = websocket.app.state.websocket_manager
     await manager.connect(websocket)
-
-    await websocket.send_json(
-        {
-            "type": "connection.ready",
-            "message": (
-                "İlk durum ve yeniden eşitleme için "
-                "REST /api/aircraft endpoint'ini kullan."
-            ),
-        }
-    )
-
     try:
+        await websocket.send_json(
+            {
+                "type": "connection.ready",
+                "message": (
+                    "İlk durum ve yeniden eşitleme için "
+                    "REST /api/aircraft endpoint'ini kullan."
+                ),
+            }
+        )
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:

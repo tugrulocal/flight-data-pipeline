@@ -30,7 +30,10 @@ compose.yaml.bak
 .pytest_cache/
 .mypy_cache/
 .coverage
+*.tsbuildinfo
 
 # Frontend bağımlılıkları ve build çıktısı
 node_modules/
 frontend/dist/
+frontend/test-results/
+frontend/playwright-report/

@@ -25,6 +25,7 @@ def parse_positive_int(value, default):
 
 @dataclass(frozen=True)
 class Settings:
+    app_version: str
     mongodb_uri: str
     mongodb_database: str
     kafka_bootstrap_servers: str
@@ -32,13 +33,21 @@ class Settings:
     kafka_realtime_consumer_group: str
     websocket_batch_interval_ms: int
     websocket_batch_max_size: int
+    live_position_window_minutes: int
     cors_origins: list[str]
 
 
 def load_settings():
     """Backend ayarlarını ortam değişkenlerinden yükler."""
 
+    app_port = parse_positive_int(os.getenv("APP_PORT"), 5173)
+    default_cors_origins = (
+        f"http://localhost:{app_port},"
+        f"http://127.0.0.1:{app_port}"
+    )
+
     return Settings(
+        app_version=os.getenv("APP_VERSION", "1.0.0-rc.1"),
         mongodb_uri=os.getenv(
             "MONGODB_URI",
             "mongodb://localhost:27017",
@@ -67,10 +76,11 @@ def load_settings():
             os.getenv("WEBSOCKET_BATCH_MAX_SIZE"),
             500,
         ),
+        live_position_window_minutes=parse_positive_int(
+            os.getenv("LIVE_POSITION_WINDOW_MINUTES"),
+            10,
+        ),
         cors_origins=parse_cors_origins(
-            os.getenv(
-                "CORS_ORIGINS",
-                "http://localhost:5173,http://127.0.0.1:5173",
-            )
+            os.getenv("CORS_ORIGINS") or default_cors_origins
         ),
     )

@@ -3,7 +3,14 @@ import json
 import logging
 from dataclasses import dataclass
 
-from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka import (
+    Consumer,
+    KafkaError,
+    KafkaException,
+    TopicPartition,
+)
+
+from .contracts import public_aircraft_from_event
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +28,7 @@ class KafkaGatewayStatus:
 
 @dataclass
 class PendingRealtimeMessage:
-    event: dict
+    event: dict | None
     message: object
 
 
@@ -50,7 +57,12 @@ class KafkaRealtimeGateway:
                     self.status.connected = False
                     self.status.last_error = str(error)
                     logger.exception(
-                        "Kafka realtime gateway bağlantı hatası."
+                        "Kafka realtime gateway bağlantı hatası.",
+                        extra={
+                            "event": "kafka_connection_error",
+                            "error": str(error),
+                            "retry_seconds": 5,
+                        },
                     )
 
                     try:
@@ -92,12 +104,20 @@ class KafkaRealtimeGateway:
             self.status.last_error = None
 
             logger.info(
-                "Kafka realtime gateway hazır | topic=%s | group=%s | "
-                "batch_interval_ms=%s | batch_max_size=%s",
-                self.settings.kafka_topic,
-                self.settings.kafka_realtime_consumer_group,
-                self.settings.websocket_batch_interval_ms,
-                self.settings.websocket_batch_max_size,
+                "Kafka realtime gateway hazır.",
+                extra={
+                    "event": "kafka_gateway_ready",
+                    "topic": self.settings.kafka_topic,
+                    "consumer_group": (
+                        self.settings.kafka_realtime_consumer_group
+                    ),
+                    "batch_interval_ms": (
+                        self.settings.websocket_batch_interval_ms
+                    ),
+                    "batch_max_size": (
+                        self.settings.websocket_batch_max_size
+                    ),
+                },
             )
 
             pending_batch = []
@@ -175,22 +195,28 @@ class KafkaRealtimeGateway:
             self.status.last_error = str(error)
 
             logger.error(
-                "Realtime mesajı atlandı | partition=%s | "
-                "offset=%s | hata=%s",
-                message.partition(),
-                message.offset(),
-                error,
+                "Realtime mesajı atlandı.",
+                extra={
+                    "event": "realtime_message_skipped",
+                    "partition": message.partition(),
+                    "offset": message.offset(),
+                    "error": str(error),
+                },
             )
 
-            await asyncio.to_thread(
-                consumer.commit,
-                message=message,
-                asynchronous=False,
+            # Bozuk realtime mesajı yayınlanmaz. Ancak hemen commit etmek,
+            # aynı partition'da batch içinde bekleyen önceki geçerli mesajı
+            # atlayabilir. Offset bu yüzden batch sınırında birlikte ilerler.
+            pending_batch.append(
+                PendingRealtimeMessage(
+                    event=None,
+                    message=message,
+                )
             )
         else:
             pending_batch.append(
                 PendingRealtimeMessage(
-                    event=event,
+                    event=public_aircraft_from_event(event, message),
                     message=message,
                 )
             )
@@ -213,37 +239,62 @@ class KafkaRealtimeGateway:
             return last_flush_at
 
         batch = pending_batch[:]
-        pending_batch.clear()
+        public_events = [
+            item.event for item in batch if item.event is not None
+        ]
 
-        await self.websocket_manager.broadcast(
-            {
-                "type": "aircraft.batch",
-                "items": [item.event for item in batch],
-            }
-        )
-
-        for item in batch:
-            await asyncio.to_thread(
-                consumer.commit,
-                message=item.message,
-                asynchronous=False,
+        if public_events:
+            await self.websocket_manager.broadcast(
+                {
+                    "type": "aircraft.batch",
+                    "items": public_events,
+                }
             )
 
-        self.status.processed_messages += len(batch)
-        self.status.published_batches += 1
+        highest_offsets = {}
+        for item in batch:
+            key = (item.message.topic(), item.message.partition())
+            highest_offsets[key] = max(
+                highest_offsets.get(key, -1),
+                item.message.offset(),
+            )
+
+        await asyncio.to_thread(
+            consumer.commit,
+            offsets=[
+                TopicPartition(topic, partition, offset + 1)
+                for (topic, partition), offset in highest_offsets.items()
+            ],
+            asynchronous=False,
+        )
+
+        # Commit başarısız olursa buraya ulaşılmaz; mesajlar yeni consumer
+        # oturumunda Kafka'dan tekrar okunur.
+        del pending_batch[:len(batch)]
+        self.status.processed_messages += len(public_events)
+        if public_events:
+            self.status.published_batches += 1
 
         if (
-            self.status.published_batches <= 10
-            or self.status.published_batches % 20 == 0
+            public_events
+            and (
+                self.status.published_batches <= 10
+                or self.status.published_batches % 20 == 0
+            )
         ):
             last_message = batch[-1].message
             logger.info(
-                "Realtime batch yayınlandı #%s | "
-                "adet=%s | son_offset=%s | clients=%s",
-                self.status.published_batches,
-                len(batch),
-                last_message.offset(),
-                self.websocket_manager.connection_count,
+                "Realtime batch yayınlandı.",
+                extra={
+                    "event": "realtime_batch_published",
+                    "batch_number": self.status.published_batches,
+                    "batch_size": len(public_events),
+                    "partition": last_message.partition(),
+                    "last_offset": last_message.offset(),
+                    "websocket_clients": (
+                        self.websocket_manager.connection_count
+                    ),
+                },
             )
 
         return now

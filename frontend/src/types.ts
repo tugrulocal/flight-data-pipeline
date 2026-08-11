@@ -13,13 +13,17 @@ export interface Aircraft {
   vertical_rate_mps: number | null;
   observed_at: string | null;
   ingested_at: string | null;
-  source: string;
-  kafka_offset: number;
+  source: string | null;
+  kafka_topic: string | null;
+  kafka_partition: number | null;
+  kafka_offset: number | null;
 }
 
 export interface AircraftListResponse {
-  count: number;
-  items: Aircraft[];
+    count: number;
+    items: Aircraft[];
+    window_minutes: number;
+    truncated: boolean;
 }
 
 export interface AircraftHistoryResponse {
@@ -29,12 +33,13 @@ export interface AircraftHistoryResponse {
 }
 
 export interface HealthResponse {
-  status: "ok" | "degraded";
+    status: "ok" | "degraded";
+    version: string;
   components: {
     mongodb: "up" | "down";
     kafka_realtime: "up" | "down";
   };
-  kafka?: {
+    kafka?: {
     topic: string;
     consumer_group: string;
     processed_messages: number;
@@ -43,7 +48,12 @@ export interface HealthResponse {
     last_error: string | null;
     batch_interval_ms: number;
     batch_max_size: number;
-  };
+    };
+    data_freshness?: {
+      last_ingested_at: string | null;
+      age_seconds: number | null;
+      status: "fresh" | "stale" | "empty";
+    };
 }
 
 export interface RealtimeMessage {

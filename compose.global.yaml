@@ -1,0 +1,5 @@
+services:
+  producer:
+    environment:
+      OPENSKY_AREA_MODE: global
+      POLL_INTERVAL_SECONDS: 120

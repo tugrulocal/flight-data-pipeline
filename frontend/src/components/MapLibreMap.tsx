@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CSSProperties } from "react";
 import * as maplibregl from "maplibre-gl";
 import mapLibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type {
@@ -15,17 +14,14 @@ import type {
 } from "geojson";
 
 import type { Aircraft } from "../types";
-import {
-  formatAltitude,
-  formatDateTime,
-  formatHeading,
-  formatSpeed,
-} from "../lib/formatters";
+import { aircraftPopupHtml } from "../lib/aircraftPopup";
 import {
   ALTITUDE_LEGEND,
   altitudeBucketKey,
   altitudeColor,
 } from "../lib/altitudeColors";
+import { AltitudeLegend } from "./MapOverlays";
+import type { RouteStatus } from "./MapOverlays";
 
 
 maplibregl.setWorkerUrl(mapLibreWorkerUrl);
@@ -104,9 +100,10 @@ interface MapLibreMapProps {
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | null;
   selectedRoute: Aircraft[];
-  routeStatus: "idle" | "loading" | "ready" | "empty" | "error";
+  routeStatus: RouteStatus;
   mapTheme: MapTheme;
   onSelectAircraft: (icao24: string | null) => void;
+  onMapError: (error: Error) => void;
 }
 
 type AircraftPointProperties = {
@@ -223,28 +220,6 @@ function createAircraftIconImage(color: string): ImageData {
 }
 
 
-function escapeHtml(value: string | null | undefined) {
-  return (value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
-function popupDateTimeHtml(value: string | null) {
-  const formatted = formatDateTime(value);
-  const match = formatted.match(/^(.*) (\d{2}:\d{2}:\d{2})$/);
-
-  if (!match) {
-    return escapeHtml(formatted);
-  }
-
-  return `${escapeHtml(match[1])}<br /><span class="popup-time">${escapeHtml(match[2])}</span>`;
-}
-
-
 function featurePropertiesToPopupProps(
   properties: Record<string, unknown> | null | undefined,
 ): AircraftPointProperties | null {
@@ -282,34 +257,15 @@ function featurePropertiesToPopupProps(
 
 
 function popupHtml(properties: AircraftPointProperties) {
-  const title = escapeHtml(properties.callsign || properties.icao24);
-  const country = escapeHtml(properties.origin_country || "Bilinmiyor");
-  const observedAt = popupDateTimeHtml(properties.observed_at);
-
-  return `
-    <div class="aircraft-popup">
-      <strong>${title}</strong>
-      <span>${country}</span>
-      <dl>
-        <div>
-          <dt>İrtifa</dt>
-          <dd>${formatAltitude(properties.altitude_m)}</dd>
-        </div>
-        <div>
-          <dt>Hız</dt>
-          <dd>${formatSpeed(properties.velocity_mps)}</dd>
-        </div>
-        <div>
-          <dt>Yön</dt>
-          <dd>${formatHeading(properties.heading_deg)}</dd>
-        </div>
-        <div class="popup-observed">
-          <dt>Son görülme</dt>
-          <dd class="popup-observed-at">${observedAt}</dd>
-        </div>
-      </dl>
-    </div>
-  `;
+  return aircraftPopupHtml({
+    icao24: properties.icao24,
+    callsign: properties.callsign,
+    origin_country: properties.origin_country,
+    baro_altitude_m: properties.altitude_m,
+    velocity_mps: properties.velocity_mps,
+    true_track_deg: properties.heading_deg,
+    observed_at: properties.observed_at,
+  });
 }
 
 
@@ -431,6 +387,7 @@ export function MapLibreMap({
   routeStatus,
   mapTheme,
   onSelectAircraft,
+  onMapError,
 }: MapLibreMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -438,14 +395,21 @@ export function MapLibreMap({
   const hoverPopupRef = useRef<maplibregl.Popup | null>(null);
   const hoverTimerRef = useRef<number | null>(null);
   const onSelectRef = useRef(onSelectAircraft);
+  const onMapErrorRef = useRef(onMapError);
   const currentThemeRef = useRef<MapTheme>("light");
+  const styleReadyRef = useRef(false);
   const [projectionMode, setProjectionMode] =
     useState<"mercator" | "globe">("mercator");
+  const [styleRevision, setStyleRevision] = useState(0);
 
   // onSelectAircraft referansını güncel tut (closure tuzağı önlenir)
   useEffect(() => {
     onSelectRef.current = onSelectAircraft;
   }, [onSelectAircraft]);
+
+  useEffect(() => {
+    onMapErrorRef.current = onMapError;
+  }, [onMapError]);
 
   /* ---- Uçak GeoJSON memo ---- */
   const aircraftGeoJson = useMemo<FeatureCollection<Point>>(() => ({
@@ -510,14 +474,28 @@ export function MapLibreMap({
       return;
     }
 
-    const map = new maplibregl.Map({
-      container,
-      style: MAPLIBRE_STYLES.light,
-      center: INITIAL_CENTER,
-      zoom: MERCATOR_ZOOM,
-      minZoom: 1,
-      maxZoom: 18,
-    });
+    const supportCanvas = document.createElement("canvas");
+    if (!supportCanvas.getContext("webgl2")) {
+      onMapErrorRef.current(new Error("WebGL2 desteklenmiyor."));
+      return;
+    }
+
+    let map: maplibregl.Map;
+    try {
+      map = new maplibregl.Map({
+        container,
+        style: MAPLIBRE_STYLES.light,
+        center: INITIAL_CENTER,
+        zoom: MERCATOR_ZOOM,
+        minZoom: 1,
+        maxZoom: 18,
+      });
+    } catch (error) {
+      onMapErrorRef.current(
+        error instanceof Error ? error : new Error("MapLibre başlatılamadı."),
+      );
+      return;
+    }
 
     map.addControl(
       new maplibregl.NavigationControl({ visualizePitch: true }),
@@ -526,8 +504,35 @@ export function MapLibreMap({
 
     mapRef.current = map;
     let interactionsBound = false;
+    let failureReported = false;
+    const canvas = map.getCanvas();
+    const reportMapFailure = (error: Error) => {
+      if (failureReported) {
+        return;
+      }
+
+      failureReported = true;
+      onMapErrorRef.current(error);
+    };
+    const handleMapError = (event: { error?: Error }) => {
+      // Stil kurulduktan sonraki tekil raster tile hataları haritanın
+      // tamamının bozulduğu anlamına gelmez. İlk stil kurulumu başarısızsa
+      // Leaflet fallback devreye girer.
+      if (!styleReadyRef.current) {
+        reportMapFailure(
+          event.error ?? new Error("MapLibre haritası yüklenemedi."),
+        );
+      }
+    };
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      reportMapFailure(new Error("WebGL bağlamı kayboldu."));
+    };
+    map.on("error", handleMapError);
+    canvas.addEventListener("webglcontextlost", handleContextLost);
 
     map.on("style.load", () => {
+      setStyleRevision((revision) => revision + 1);
       /* Her irtifa rengi için ayrı bir Canvas ikonu ekle */
       for (const item of ALTITUDE_LEGEND) {
         const iconName = `aircraft-${item.key}`;
@@ -672,6 +677,7 @@ export function MapLibreMap({
       map.setProjection({ type: projectionModeRef.current });
 
       if (interactionsBound) {
+        styleReadyRef.current = true;
         return;
       }
 
@@ -732,6 +738,8 @@ export function MapLibreMap({
           onSelectRef.current(null);
         }
       });
+
+      styleReadyRef.current = true;
     });
 
     return () => {
@@ -740,8 +748,15 @@ export function MapLibreMap({
       }
       hoverPopupRef.current?.remove();
       popupRef.current?.remove();
-      map.remove();
+      map.off("error", handleMapError);
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
+      try {
+        map.remove();
+      } catch {
+        // Kısmen kurulmuş WebGL context temizliği fallback'i engellememeli.
+      }
       mapRef.current = null;
+      styleReadyRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -763,6 +778,7 @@ export function MapLibreMap({
     }
 
     currentThemeRef.current = mapTheme;
+    styleReadyRef.current = false;
 
     hoverPopupRef.current?.remove();
     hoverPopupRef.current = null;
@@ -780,7 +796,7 @@ export function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map || !styleReadyRef.current) {
       return;
     }
 
@@ -811,7 +827,7 @@ export function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map || !styleReadyRef.current) {
       return;
     }
 
@@ -831,7 +847,7 @@ export function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map || !styleReadyRef.current) {
       return;
     }
 
@@ -865,7 +881,7 @@ export function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map || !styleReadyRef.current) {
       return;
     }
 
@@ -897,7 +913,7 @@ export function MapLibreMap({
       .setLngLat([selectedAircraft.longitude, selectedAircraft.latitude])
       .setHTML(popupHtml(props))
       .addTo(map);
-  }, [selectedAircraft]);
+  }, [selectedAircraft, styleRevision]);
 
 
   /* ================================================================ */
@@ -933,42 +949,7 @@ export function MapLibreMap({
         </button>
       </div>
 
-      {/* Rota durumu */}
-      {selectedAircraft && (
-        <div className={`route-status ${routeStatus}`}>
-          <strong>
-            {selectedAircraft.callsign || selectedAircraft.icao24}
-          </strong>
-          <span>
-            {routeStatus === "loading" && "Rota yükleniyor…"}
-            {routeStatus === "ready"
-              && `${selectedRoute.length} nokta ile irtifa renkli rota`}
-            {routeStatus === "empty"
-              && "Rota için yeterli geçmiş nokta yok"}
-            {routeStatus === "error" && "Rota alınamadı"}
-            {routeStatus === "idle" && "Uçak seçildi"}
-          </span>
-        </div>
-      )}
-
-      {/* İrtifa renk efsanesi */}
-      <div
-        className="altitude-legend"
-        aria-label="İrtifaya göre uçak renkleri"
-      >
-        <strong>Altitude (ft)</strong>
-        <div className="altitude-legend-grid">
-          {ALTITUDE_LEGEND.filter((item) => !("hiddenFromScale" in item)).map((item) => (
-            <span key={item.key}>
-              <i
-                className="legend-swatch"
-                style={{ "--legend-color": item.color } as CSSProperties}
-              />
-              {item.label}
-            </span>
-          ))}
-        </div>
-      </div>
+      <AltitudeLegend />
     </div>
   );
 }

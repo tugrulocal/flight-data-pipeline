@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      release_gate:
+        description: Resmî Kafka ve MongoDB image'larını da release kapısında tara
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.14"
+          cache: pip
+      - name: Bağımlılıkları doğrula ve kur
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.txt
+          python -m pip install --require-hashes -r producer/requirements.txt
+          python -m pip install --require-hashes -r consumer/requirements.txt
+          python -m pip install --require-hashes -r backend/requirements.txt
+      - name: Python testleri
+        run: pytest -q
+      - name: Python dependency audit
+        run: |
+          python -m pip install pip-audit
+          pip-audit -r producer/requirements.txt
+          pip-audit -r consumer/requirements.txt
+          pip-audit -r backend/requirements.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  compose-and-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose sözleşmesi
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.yaml -f compose.dev.yaml config --quiet
+      - name: Uygulama image'larını oluştur
+        run: docker compose -f compose.yaml -f compose.dev.yaml build producer consumer backend frontend
+      - name: Production image içeriğini doğrula
+        run: |
+          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-producer:1.0.0-rc.1 -c 'test ! -e /app/mock_producer.py && test ! -d /app/tests'
+          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-consumer:1.0.0-rc.1 -c 'test ! -d /app/tests'
+          docker run --rm --entrypoint sh ghcr.io/tugrulocal/flight-data-pipeline-backend:1.0.0-rc.1 -c 'test ! -d /app/tests'
+      - name: Image zafiyet taraması
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-backend:1.0.0-rc.1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Producer image zafiyet taraması
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-producer:1.0.0-rc.1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Consumer image zafiyet taraması
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-consumer:1.0.0-rc.1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Frontend image zafiyet taraması
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/tugrulocal/flight-data-pipeline-frontend:1.0.0-rc.1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Kafka image zafiyet taraması
+        if: ${{ inputs.release_gate == true }}
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: MongoDB image zafiyet taraması
+        if: ${{ inputs.release_gate == true }}
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: mongo:8.0.28@sha256:98605bfa1bb2a15dd82109e1d78ad31527a9a744909fab4606076fa71a0ae515
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: İzole Kafka/MongoDB akışı
+        run: tests/integration/run.sh

@@ -1,0 +1,101 @@
+name: flight-data-pipeline-integration
+
+services:
+  kafka:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 1000
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  topic-init:
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_RAW_RETENTION_MS: 60000
+      KAFKA_RAW_RETENTION_BYTES: 10485760
+      KAFKA_DLQ_RETENTION_MS: 60000
+      KAFKA_DLQ_RETENTION_BYTES: 10485760
+    volumes:
+      - ../../kafka/init-topics.sh:/opt/flight/init-topics.sh:ro
+    entrypoint: ["/bin/sh", "/opt/flight/init-topics.sh"]
+
+  mongodb:
+    image: mongo:8.0.28@sha256:98605bfa1bb2a15dd82109e1d78ad31527a9a744909fab4606076fa71a0ae515
+    command:
+      - mongod
+      - --bind_ip_all
+      - --wiredTigerCacheSizeGB
+      - "0.5"
+      - --setParameter
+      - ttlMonitorSleepSecs=1
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  consumer:
+    build:
+      context: ../..
+      dockerfile: consumer/Dockerfile
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+      mongodb:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MONGODB_URI: mongodb://mongodb:27017
+      CONSUMER_RETRY_BACKOFF_SECONDS: 1
+    restart: on-failure
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+      mongodb:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MONGODB_URI: mongodb://mongodb:27017
+      APP_VERSION: integration
+      LIVE_POSITION_WINDOW_MINUTES: 10
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:15173:80"

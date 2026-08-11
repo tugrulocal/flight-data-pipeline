@@ -5,8 +5,8 @@
 .venv-*/
 venv/
 
-__pycache__/
-*.py[cod]
+**/__pycache__/
+**/*.py[cod]
 *$py.class
 
 .env
@@ -22,6 +22,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .coverage
+**/*.tsbuildinfo
 
 **/node_modules/
 **/dist/
+**/test-results/
+**/playwright-report/

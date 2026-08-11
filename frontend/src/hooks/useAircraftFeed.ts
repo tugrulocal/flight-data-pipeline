@@ -11,6 +11,21 @@ import type {
 
 const MAX_RECONNECT_DELAY_MS = 15_000;
 const SNAPSHOT_AIRCRAFT_LIMIT = 20_000;
+const DEFAULT_LIVE_WINDOW_MINUTES = 10;
+
+
+export function isRecentlyObserved(
+  observedAt: string | null,
+  nowMs: number,
+  maxAgeMs: number,
+) {
+  if (!observedAt) {
+    return false;
+  }
+
+  const observedMs = new Date(observedAt).getTime();
+  return Number.isFinite(observedMs) && nowMs - observedMs <= maxAgeMs;
+}
 
 
 function websocketUrl() {
@@ -33,6 +48,39 @@ function sortAircraft(items: Iterable<Aircraft>) {
 }
 
 
+export function isNewerAircraftUpdate(
+  current: Aircraft | undefined,
+  update: Aircraft,
+) {
+  if (!current) {
+    return true;
+  }
+
+  const currentTime = current.observed_at
+    ? new Date(current.observed_at).getTime()
+    : 0;
+  const updateTime = update.observed_at
+    ? new Date(update.observed_at).getTime()
+    : 0;
+
+  if (updateTime !== currentTime) {
+    return updateTime > currentTime;
+  }
+
+  return (update.kafka_offset ?? -1) >= (current.kafka_offset ?? -1);
+}
+
+
+export function mergeAircraftUpdate(
+  target: Map<string, Aircraft>,
+  update: Aircraft,
+) {
+  if (isNewerAircraftUpdate(target.get(update.icao24), update)) {
+    target.set(update.icao24, update);
+  }
+}
+
+
 export function useAircraftFeed() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [connectionStatus, setConnectionStatus] =
@@ -41,6 +89,9 @@ export function useAircraftFeed() {
     useState<HealthResponse | null>(null);
   const [lastSnapshotAt, setLastSnapshotAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveWindowMinutes, setLiveWindowMinutes] =
+    useState(DEFAULT_LIVE_WINDOW_MINUTES);
+  const [snapshotTruncated, setSnapshotTruncated] = useState(false);
 
   const aircraftByIdRef = useRef(new Map<string, Aircraft>());
   const pendingUpdatesRef = useRef(new Map<string, Aircraft>());
@@ -61,7 +112,7 @@ export function useAircraftFeed() {
     const nextAircraft = new Map(aircraftByIdRef.current);
 
     for (const [icao24, update] of pendingUpdatesRef.current) {
-      nextAircraft.set(icao24, update);
+      mergeAircraftUpdate(nextAircraft, update);
     }
 
     pendingUpdatesRef.current.clear();
@@ -113,7 +164,7 @@ export function useAircraftFeed() {
       );
 
       for (const [icao24, update] of pendingUpdatesRef.current) {
-        nextAircraft.set(icao24, update);
+        mergeAircraftUpdate(nextAircraft, update);
       }
 
       pendingUpdatesRef.current.clear();
@@ -125,6 +176,12 @@ export function useAircraftFeed() {
 
       setAircraft(sortAircraft(nextAircraft.values()));
       setLastSnapshotAt(new Date());
+      setLiveWindowMinutes(
+        Number.isFinite(snapshot.window_minutes)
+          ? snapshot.window_minutes
+          : DEFAULT_LIVE_WINDOW_MINUTES,
+      );
+      setSnapshotTruncated(Boolean(snapshot.truncated));
       setError(null);
 
       if (healthResponse.ok) {
@@ -199,8 +256,8 @@ export function useAircraftFeed() {
               return;
             }
 
-            pendingUpdatesRef.current.set(
-              message.data.icao24,
+            mergeAircraftUpdate(
+              pendingUpdatesRef.current,
               message.data,
             );
             scheduleUpdateFlush();
@@ -210,7 +267,7 @@ export function useAircraftFeed() {
           if (message.type === "aircraft.batch") {
             for (const item of message.items ?? []) {
               if (item.icao24) {
-                pendingUpdatesRef.current.set(item.icao24, item);
+                mergeAircraftUpdate(pendingUpdatesRef.current, item);
               }
             }
 
@@ -276,6 +333,8 @@ export function useAircraftFeed() {
     connectionStatus,
     error,
     lastSnapshotAt,
+    liveWindowMinutes,
+    snapshotTruncated,
     refreshSnapshot,
   };
 }

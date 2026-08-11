@@ -8,7 +8,14 @@ import {
 
 import { AircraftMap } from "./components/AircraftMap";
 import { AircraftTable } from "./components/AircraftTable";
-import { useAircraftFeed } from "./hooks/useAircraftFeed";
+import { MapErrorBoundary } from "./components/MapErrorBoundary";
+import { TakeoffIcon } from "./components/TakeoffIcon";
+import airplaneIcon from "./icons/airplane.png";
+import largeAirplaneLogo from "./icons/airplane buyuk logo.png";
+import {
+  isRecentlyObserved,
+  useAircraftFeed,
+} from "./hooks/useAircraftFeed";
 import { formatTime } from "./lib/formatters";
 import type { MapTheme } from "./components/MapLibreMap";
 import type {
@@ -18,11 +25,6 @@ import type {
 
 
 const TABLE_ROW_LIMIT = 300;
-const LIVE_POSITION_WINDOW_MINUTES = Number(
-  import.meta.env.VITE_LIVE_POSITION_WINDOW_MINUTES ?? 10,
-);
-const LIVE_POSITION_MAX_AGE_MS =
-  LIVE_POSITION_WINDOW_MINUTES * 60 * 1000;
 const ROUTE_HISTORY_LIMIT = 120;
 
 const MapLibreMap = lazy(() =>
@@ -59,16 +61,24 @@ function MoonIcon() {
 }
 
 
-function isRecentlyObserved(observedAt: string | null, nowMs: number) {
-  if (!observedAt) {
-    return false;
-  }
-
-  const observedMs = new Date(observedAt).getTime();
-
+function SearchIcon() {
   return (
-    Number.isFinite(observedMs)
-    && nowMs - observedMs <= LIVE_POSITION_MAX_AGE_MS
+    <svg
+      className="search-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.2 4.2" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
   );
 }
 
@@ -76,11 +86,12 @@ function isRecentlyObserved(observedAt: string | null, nowMs: number) {
 function App() {
   const {
     aircraft,
-    backendHealth,
     connectionStatus,
     error,
     lastSnapshotAt,
+    liveWindowMinutes,
     refreshSnapshot,
+    snapshotTruncated,
   } = useAircraftFeed();
   const [search, setSearch] = useState("");
   const [selectedIcao24, setSelectedIcao24] =
@@ -88,10 +99,43 @@ function App() {
   const [routeHistory, setRouteHistory] = useState<Aircraft[]>([]);
   const [routeStatus, setRouteStatus] =
     useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
-  const [mapEngine, setMapEngine] =
-    useState<"leaflet" | "maplibre">("maplibre");
   const [mapTheme, setMapTheme] = useState<MapTheme>("light");
+  const [mapFallbackReason, setMapFallbackReason] = useState<string | null>(
+    null,
+  );
+  const [mapRetryKey, setMapRetryKey] = useState(0);
+  const [isOperationsOpen, setIsOperationsOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const livePositionMaxAgeMs = liveWindowMinutes * 60 * 1000;
+
+  useEffect(() => {
+    const iconLink = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!iconLink) {
+      return;
+    }
+
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      context.globalCompositeOperation = "source-in";
+      context.fillStyle = "#4de3c1";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      iconLink.href = canvas.toDataURL("image/png");
+    };
+    image.src = airplaneIcon;
+
+    return () => {
+      image.onload = null;
+    };
+  }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(
@@ -169,9 +213,13 @@ function App() {
 
   const liveAircraft = useMemo(
     () => aircraft.filter((item) =>
-      isRecentlyObserved(item.observed_at, nowMs),
+      isRecentlyObserved(
+        item.observed_at,
+        nowMs,
+        livePositionMaxAgeMs,
+      ),
     ),
-    [aircraft, nowMs],
+    [aircraft, livePositionMaxAgeMs, nowMs],
   );
 
   const hiddenStaleCount = aircraft.length - liveAircraft.length;
@@ -198,12 +246,15 @@ function App() {
   const statistics = useMemo(() => {
     let airborne = 0;
     let onGround = 0;
+    let unknown = 0;
 
     for (const item of liveAircraft) {
-      if (item.on_ground) {
+      if (item.on_ground === true) {
         onGround += 1;
-      } else {
+      } else if (item.on_ground === false) {
         airborne += 1;
+      } else {
+        unknown += 1;
       }
     }
 
@@ -211,6 +262,7 @@ function App() {
       total: liveAircraft.length,
       airborne,
       onGround,
+      unknown,
     };
   }, [liveAircraft]);
 
@@ -235,9 +287,12 @@ function App() {
       <section className="map-panel flight-map-stage">
         <div className="map-stage-head">
           <div className="brand">
-            <div className="brand-mark" aria-hidden="true">
-              <span />
-            </div>
+            <img
+              className="brand-airplane-icon"
+              src={largeAirplaneLogo}
+              alt=""
+              aria-hidden="true"
+            />
             <div>
               <p className="eyebrow">Canlı uçuş ağı</p>
               <h1>Flight Pulse</h1>
@@ -245,7 +300,7 @@ function App() {
           </div>
 
           <div className="map-top-actions">
-            <div
+            {!mapFallbackReason && <div
               className="map-theme-toggle"
               aria-label="Harita tema seçimi"
             >
@@ -267,7 +322,7 @@ function App() {
               >
                 <MoonIcon />
               </button>
-            </div>
+            </div>}
 
             <div className={`connection-pill ${connectionStatus}`}>
               <span className="status-dot" />
@@ -283,25 +338,7 @@ function App() {
           </div>
         </div>
 
-        <div className="map-engine-switch" aria-label="Harita motoru seçimi">
-          <span>Harita motoru</span>
-          <button
-            type="button"
-            className={mapEngine === "leaflet" ? "active" : ""}
-            onClick={() => setMapEngine("leaflet")}
-          >
-            Leaflet
-          </button>
-          <button
-            type="button"
-            className={mapEngine === "maplibre" ? "active" : ""}
-            onClick={() => setMapEngine("maplibre")}
-          >
-            MapLibre (WebGL)
-          </button>
-        </div>
-
-        {mapEngine === "leaflet" ? (
+        {mapFallbackReason ? (
           <AircraftMap
             aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
@@ -310,87 +347,136 @@ function App() {
             onSelectAircraft={setSelectedIcao24}
           />
         ) : (
-          <Suspense
-            fallback={
-              <div className="map-shell loading-fallback">
-                MapLibre haritası yükleniyor…
-              </div>
-            }
+          <MapErrorBoundary
+            resetKey={mapRetryKey}
+            onError={(mapError) => setMapFallbackReason(mapError.message)}
           >
-            <MapLibreMap
-              aircraft={filteredAircraft}
-              selectedAircraft={selectedAircraft}
-              selectedRoute={routeHistory}
-              routeStatus={routeStatus}
-              mapTheme={mapTheme}
+            <Suspense
+              fallback={
+                <div className="map-shell loading-fallback">
+                  MapLibre haritası yükleniyor…
+                </div>
+              }
+            >
+              <MapLibreMap
+                key={mapRetryKey}
+                aircraft={filteredAircraft}
+                selectedAircraft={selectedAircraft}
+                selectedRoute={routeHistory}
+                routeStatus={routeStatus}
+                mapTheme={mapTheme}
+                onSelectAircraft={setSelectedIcao24}
+                onMapError={(mapError) =>
+                  setMapFallbackReason(mapError.message)
+                }
+              />
+            </Suspense>
+          </MapErrorBoundary>
+        )}
+
+        {mapFallbackReason && (
+          <aside className="map-fallback-notice" role="status">
+            <span>
+              Uyumluluk haritası aktif.
+              <small>{mapFallbackReason}</small>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setMapFallbackReason(null);
+                setMapRetryKey((key) => key + 1);
+              }}
+            >
+              WebGL'i tekrar dene
+            </button>
+          </aside>
+        )}
+
+        <div className="map-dashboard">
+          <label className="search-field map-search-field">
+            <span className="sr-only">Uçak ara</span>
+            <SearchIcon />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Uçuş, ICAO24 veya ülke ara"
+            />
+          </label>
+
+          <section className="metrics map-metrics" aria-label="Canlı uçuş istatistikleri">
+            <article className="flight-summary-card">
+              <div>
+                <span>Canlı</span>
+                <strong>{statistics.total}</strong>
+                <small>son {liveWindowMinutes} dk</small>
+              </div>
+              <div>
+                <span>Havada</span>
+                <strong>{statistics.airborne}</strong>
+                <small>aktif uçuş</small>
+              </div>
+              <div>
+                <span>Yerde</span>
+                <strong>{statistics.onGround}</strong>
+                <small>
+                  {statistics.unknown > 0
+                    ? `${statistics.unknown} bilinmiyor`
+                    : "son durum"}
+                </small>
+              </div>
+            </article>
+          </section>
+
+        </div>
+
+        <aside
+          className={`operations-drawer ${
+            isOperationsOpen ? "is-open" : ""
+          }`}
+          aria-label="Operasyon listesi"
+        >
+          {!isOperationsOpen && (
+            <button
+              type="button"
+              className="operations-toggle"
+              onClick={() => setIsOperationsOpen(true)}
+              aria-expanded="false"
+              aria-controls="operations-panel"
+              aria-label="Operasyonlar"
+            >
+              <TakeoffIcon className="operations-takeoff-icon" />
+              <span>Operasyonlar</span>
+            </button>
+          )}
+
+          <div id="operations-panel" className="operations-panel">
+            <div className="operations-panel-header">
+              <div>
+                <p className="eyebrow">Operasyon listesi</p>
+                <h2>Uçaklar</h2>
+              </div>
+              <button
+                type="button"
+                className="operations-close"
+                onClick={() => setIsOperationsOpen(false)}
+                aria-label="Operasyon listesini kapat"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <AircraftTable
+              aircraft={filteredAircraft.slice(0, TABLE_ROW_LIMIT)}
+              selectedIcao24={selectedIcao24}
               onSelectAircraft={setSelectedIcao24}
             />
-          </Suspense>
-        )}
 
-        <label className="search-field map-search-field">
-          <span className="sr-only">Uçak ara</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Uçuş, ICAO24 veya ülke ara"
-          />
-        </label>
-
-        <section className="metrics map-metrics" aria-label="Canlı uçuş istatistikleri">
-          <article>
-            <span>Canlı</span>
-            <strong>{statistics.total}</strong>
-            <small>son {LIVE_POSITION_WINDOW_MINUTES} dk</small>
-          </article>
-          <article>
-            <span>Havada</span>
-            <strong>{statistics.airborne}</strong>
-            <small>aktif uçuş</small>
-          </article>
-          <article>
-            <span>Yerde</span>
-            <strong>{statistics.onGround}</strong>
-            <small>son durum</small>
-          </article>
-          <article>
-            <span>Sistem</span>
-            <strong className="system-state">
-              {backendHealth?.status === "ok" ? "Sağlıklı" : "Kontrol"}
-            </strong>
-            <small>Kafka + MongoDB</small>
-          </article>
-        </section>
-
-        <div className="map-count-pill">
-          Son {LIVE_POSITION_WINDOW_MINUTES} dk: {filteredAircraft.length} uçak
-          {hiddenStaleCount > 0
-            ? ` · ${hiddenStaleCount} daha eski son konum gizli`
-            : ""}
-        </div>
-      </section>
-
-      <section className="table-panel">
-        <div className="section-heading table-heading">
-          <div>
-            <p className="eyebrow">Operasyon listesi</p>
-            <h2>Uçaklar</h2>
           </div>
-        </div>
+        </aside>
 
-        <AircraftTable
-          aircraft={filteredAircraft.slice(0, TABLE_ROW_LIMIT)}
-          selectedIcao24={selectedIcao24}
-          onSelectAircraft={setSelectedIcao24}
-        />
-
-        {filteredAircraft.length > TABLE_ROW_LIMIT && (
-          <p className="table-note">
-            Akıcı kaydırma için ilk {TABLE_ROW_LIMIT} kayıt gösteriliyor.
-          </p>
-        )}
       </section>
+
     </main>
   );
 }

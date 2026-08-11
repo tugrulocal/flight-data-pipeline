@@ -131,7 +131,7 @@ Sürümleri değiştirmeden önce mevcut dosyaları ve uyumluluğu kontrol et. G
 - Kafka ve MongoDB için ayrı named volume'lar tanımlandı.
 - `topic-init` servisi topic'i `--if-not-exists` ile oluşturacak şekilde düzeltildi.
 - Git repository başlatıldı ve ana dal `main` olarak ayarlandı.
-- `requirements.txt` ve `.dockerignore` oluşturuldu.
+- Servis bazlı, hash doğrulamalı Python lock dosyaları ve `.dockerignore` oluşturuldu.
 - Producer ve consumer için Docker image'ları oluşturuldu.
 - Producer ve consumer servisleri `compose.yaml` içine eklendi.
 - Producer → Kafka → consumer → MongoDB akışı log, lag ve MongoDB sorgularıyla doğrulandı.
@@ -144,20 +144,29 @@ Sürümleri değiştirmeden önce mevcut dosyaları ve uyumluluğu kontrol et. G
 - React + TypeScript frontend oluşturuldu.
 - Canlı uçak tablosu, arama, sistem durumu ve Leaflet harita eklendi.
 - Frontend ilk açılışta REST snapshot alıyor; WebSocket yeniden bağlandığında REST ile tekrar eşitleniyor.
-- Leaflet'e geçilerek harita pan/zoom etkileşimleri sadeleştirildi.
-- Uçaklar Leaflet `divIcon` marker'larıyla uçak sembolü olarak, uçuş yönüne göre döndürülerek gösteriliyor.
+- MapLibre varsayılan harita motoru yapıldı; Leaflet aynı public veri sözleşmesini kullanan otomatik uyumluluk katmanı olarak korundu.
+- Uçaklar her iki motorda uçuş yönüne göre döndürülen sembollerle gösteriliyor.
 - Uçak renkleri yüksek kontrastlı irtifa aralıklarına göre veriliyor ve haritada metre aralıklarını açıklayan renk efsanesi gösteriliyor.
 - Uçağa tıklanınca frontend `raw_positions` history endpoint'inden geçmiş noktaları alıp seçili uçağın rotasını haritada çiziyor. Rota kesikli değildir; segmentler uçağın o noktadaki irtifa aralığına göre renklendirilir.
-- MapLibre GL JS kontrollü deney modu olarak eklendi. Leaflet varsayılan/fallback harita motoru kalır; MapLibre lazy-load edilir ve base map, pan/zoom, düz/küre projection geçişi ile canlı uçakları WebGL circle layer olarak çizme davranışını doğrular. Uçak sembolleri ve rota henüz MapLibre'ye taşınmamıştır.
+- MapLibre GL JS varsayılan harita motorudur; uçak sembolleri, popup ve irtifa renkli rota WebGL üzerinde çalışır. WebGL/yükleme/context hatasında otomatik Leaflet fallback açılır ve yeniden deneme düğmesi gösterilir.
 - Frontend canlı ekranda yalnızca son 10 dakika içinde gözlenen uçakları gösteriyor; daha eski `live_positions` kayıtları geçmiş/snapshot verisi olarak saklanıyor ama haritadan gizleniyor.
 - Harita OpenStreetMap raster tile katmanını kullanıyor.
 - WebSocket güncellemeleri `requestAnimationFrame` ile toplu uygulanıyor.
 - Frontend Nginx image'ı ve aynı-origin REST/WebSocket proxy yapılandırması oluşturuldu.
 - Nginx üzerinden bağlanan WebSocket istemcisinin gerçek OpenSky mesajı aldığı doğrulandı.
+- Raw event sözleşmesine `schema_version=1` ve UUID `event_id` eklendi.
+- Kalıcı bozuk mesajlar Base64 kaynak zarfıyla `aircraft.positions.dlq.v1` topic'ine güvenli biçimde taşınıyor; DLQ teslimi doğrulanmadan ana offset ilerlemiyor.
+- MongoDB geçici hataları sınırlı exponential backoff ile deneniyor; sınır aşılırsa geçerli mesaj DLQ'ya atılmadan consumer non-zero çıkıyor.
+- `raw_positions` ve `live_positions` TTL index'leri `ingested_at` üzerinden, canlı liste index'i `observed_at` üzerinden yönetiliyor.
+- Unit, frontend, Playwright ve izole Kafka/MongoDB integration test altyapısı eklendi.
+- Release Compose yalnız frontend portunu loopback'e açıyor; development override debug portlarını ve source build'lerini ekliyor.
+- Release workflow ortak CI/audit/integration kapısından sonra AMD64/ARM64 image, SPDX SBOM, provenance ve keyless Cosign imzası üretir; resmî Kafka/Mongo taraması geçmeden publish başlamaz.
+- AMD64/ARM64 offline paketleyici dış ve paket içi SHA-256, sürümlü Compose, setup/backup/restore scriptleri ve operasyon dokümanlarını içerir.
+- Setup scriptleri mimari, Docker/Compose sürümü, 4 GB bellek, port, disk ve offline image bütünlüğünü doğrular. Restore çalışan MongoDB consumer varken veya dolu hedefte açık replace onayı olmadan çalışmaz.
 
 ## Consumer teslim garantisi
 
-Mevcut consumer tasarımı **at-least-once** işlemeye yakındır:
+Mevcut consumer tasarımı **at-least-once + idempotent yazım** sağlar:
 
 1. Kafka mesajı alınır.
 2. Mesaj `raw_positions` collection'ına yazılır.
@@ -168,10 +177,10 @@ Mevcut consumer tasarımı **at-least-once** işlemeye yakındır:
 Consumer çöküp yeniden başladığında commit edilmemiş mesajı yeniden okuyabilir. Bu nedenle raw kayıt kimliği:
 
 ```text
-topic:partition:offset
+event_id
 ```
 
-biçimindedir ve `update_one(..., upsert=True)` ile yazılır. Aynı Kafka mesajı tekrar işlense bile ikinci raw belge oluşmaz. Bu, **idempotent consumer yazımıdır**.
+Yeni mesajlarda producer'ın bir kez ürettiği UUID `event_id`, legacy mesajlarda `topic:partition:offset` fallback'i kullanılır. `update_one(..., upsert=True)` sayesinde aynı Kafka mesajı tekrar işlense bile ikinci raw belge oluşmaz.
 
 Şu ayrımı kullanıcıya açıkla:
 
@@ -185,7 +194,7 @@ biçimindedir ve `update_one(..., upsert=True)` ile yazılır. Aynı Kafka mesaj
 
 - Her Kafka mesajının tarihçesini saklar.
 - Analiz, geçmiş sorgusu, yeniden oynatma ve hata inceleme için kullanılır.
-- `_id = topic:partition:offset`
+- `_id = event_id`; legacy olaylarda `topic:partition:offset`
 - Temel index: `{ icao24: 1, observed_at: -1 }`
 
 ### `live_positions`
@@ -197,9 +206,9 @@ biçimindedir ve `update_one(..., upsert=True)` ile yazılır. Aynı Kafka mesaj
 
 ## Bilinen teknik riskler ve daha sonraki iyileştirmeler
 
-- Hatalı/bozuk bir Kafka mesajı consumer'ın aynı offset'te tekrar tekrar durmasına yol açabilir. Retry sınırı ve dead-letter topic daha sonra eklenmeli.
-- Yeni ve boş bir Kafka cluster'ı eski MongoDB volume'uyla birleştirilirse `topic:partition:offset` kimlikleri çakışabilir. Cluster değişiminde yeni volume kullan veya kimliğe cluster/source bilgisi ekle.
-- OpenSky çağrı aralığı 30 saniyedir ve producer Türkiye + yakın çevresi kutusunu sorgular. Bu geniş kutu yaklaşık 178.5 sq° olduğu için `/states/all` tarafında istek başına yaklaşık 3 kredi tüketir. Anonim kota 400 kredi/gün, standart kayıtlı kullanıcı kotası 4000 kredi/gün, active feeder kotası 8000 kredi/gün düzeyindedir; 30 saniyede bir tüm gün çalışmak yaklaşık 8640 kredi/gün tüketir. Bu yüzden standart kayıt 30 saniye/tüm gün için hâlâ yetmeyebilir. Producer rate-limit header'ına göre beklemelidir. Daha sürdürülebilir kullanım için OAuth/API client, feeder hesabı, lisanslı erişim, daha küçük bounding box veya daha uzun poll aralığı değerlendirilmelidir.
+- DLQ operasyonel olarak izlenmelidir; kalıcı hatalar ana akışı durdurmaz ama veri sözleşmesi sorununu görünmez kılmamalıdır.
+- Legacy offset tabanlı `_id` kayıtları korunur; yeni UUID `event_id` yapısı yeni boş Kafka cluster'ı ile restore edilen eski Mongo dump'ında kimlik çakışması riskini azaltır.
+- Türkiye modunun varsayılan çağrı aralığı 30, global profilin aralığı 120 saniyedir. Türkiye kutusu yaklaşık 178.5 sq° olduğu için `/states/all` tarafında istek başına yaklaşık 3 kredi tüketir. Kota hesabı kullanıcının OpenSky hesap türüne göre doğrulanmalıdır; producer rate-limit header'ına göre bekler. Daha sürdürülebilir kullanım için OAuth/API client, feeder hesabı, lisanslı erişim, daha küçük bounding box veya daha uzun poll aralığı değerlendirilmelidir.
 - OpenSky OAuth client credential değerleri yalnızca local `.env` içinde tutulmalıdır; `.env.example` sadece boş örnek değişkenleri içermelidir. Chat'e veya terminal çıktısına düşen secret açığa çıkmış kabul edilmeli ve OpenSky hesabından yenilenmelidir.
 - Producer `OPENSKY_AREA_MODE=turkey|global` destekler. `turkey` modunda Türkiye + yakın çevresi bounding box'ı gönderilir; `global` modunda bounding box gönderilmeden tüm dünya istenir. Varsayılan `turkey` kalmalıdır; global mod daha fazla kredi ve daha fazla frontend/backend yükü üretir.
 - Frontend MongoDB'ye doğrudan bağlanmamalıdır; veri FastAPI üzerinden sunulmalıdır.
@@ -207,24 +216,18 @@ biçimindedir ve `update_one(..., upsert=True)` ile yazılır. Aynı Kafka mesaj
 - MongoDB writer ve FastAPI realtime consumer aynı Kafka group'u kullanmamalıdır. Aynı group kullanılırsa mesajlar iki işlev arasında paylaştırılır; her ikisi de bütün mesajları alamaz.
 - WebSocket geçici güncelleme kanalıdır. İlk yükleme ve bağlantı sonrası yeniden eşitleme için `live_positions` REST endpoint'i kalıcı durum kaynağı olmalıdır.
 - Backend şimdilik tek Uvicorn worker ile çalışmalıdır. Birden fazla worker ayrı WebSocket istemci listeleri oluşturur; ortak pub/sub katmanı olmadan Kafka mesajını almayan worker kendi istemcilerine yayın yapamaz.
-- Leaflet haritasında pan/zoom Leaflet'in kendi event modeliyle yönetilmelidir; zoom/pan state'i React state'ine taşınmamalıdır.
-- Canlı harita eski konumları göstermemelidir. Şu an frontend son 10 dakikadan eski `observed_at` değerlerini canlı ekrandan gizler.
+- Pan/zoom seçili harita motorunun kendi event modeliyle yönetilmelidir; zoom/pan state'i React state'ine taşınmamalıdır.
+- Canlı harita eski konumları göstermemelidir. Backend ve frontend runtime `LIVE_POSITION_WINDOW_MINUTES` değerini ortak sözleşmeden uygular; varsayılan 10 dakikadır.
 - WebSocket mesajları çok sık gelirse her mesajda ayrı render yerine ekran karesi içinde toplu uygulanmalıdır.
 - OpenStreetMap public tile servisi yalnızca local eğitim içindir. Production öncesinde kullanım politikası, destek ve erişilebilirlik gereksinimine uygun bir tile sağlayıcısı veya self-hosted çözüm seçilmelidir.
 - Geliştirme ortamındaki plaintext Kafka ve kimlik doğrulamasız MongoDB yalnızca local eğitim içindir.
 
 ## Sıradaki işler
 
-Öncelik sırasını koru:
-
-1. Mevcut dosyaları ve Git durumunu incele.
-2. MongoDB writer consumer için sınırlı retry davranışı tasarla.
-3. Dead-letter topic adını ve mesaj zarfını belirle.
-4. Retry sonrası hâlâ işlenemeyen mesajı DLQ'ya gönderip ana offseti güvenli biçimde ilerlet.
-5. Retry, DLQ, consumer lag ve yeniden başlatma davranışını test et.
-6. Yapılandırılmış loglar ve temel gözlemlenebilirlik geliştirmelerini ekle.
-
-Bir sonraki aşamaya geçmeden önce mevcut aşamayı çalışan bir testle doğrula.
+1. Resmî Kafka/MongoDB image taramasındaki `SECURITY.md` upstream bulgularının düzeltmeli image veya kanıtlı VEX ile kapanmasını bekle; release kapısını yeniden çalıştır.
+2. Kullanıcı açıkça istemeden push/tag oluşturma. Güvenlik kapısı geçince aynı commit'i önce `v1.0.0-rc.1` olarak yayınla.
+3. `docs/release-acceptance.md` içindeki Windows AMD64, macOS ARM64/Intel ve Linux AMD64/ARM64 matrisini gerçek makinelerde tamamla.
+4. Bütün kabul satırları geçerse aynı commit'i `v1.0.0` olarak etiketle.
 
 ## Beklenen proje yapısı
 
@@ -235,16 +238,19 @@ flight-data-pipeline/
 ├── .gitignore
 ├── .dockerignore
 ├── compose.yaml
-├── requirements.txt
+├── requirements-dev.in/.txt
 ├── producer/
 │   ├── Dockerfile
+│   ├── requirements.in/.txt
 │   ├── mock_producer.py
 │   └── opensky_producer.py
 ├── consumer/
 │   ├── Dockerfile
+│   ├── requirements.in/.txt
 │   └── mongodb_consumer.py
 ├── backend/
 │   ├── Dockerfile
+│   ├── requirements.in/.txt
 │   └── app/
 └── frontend/
 ```
@@ -265,14 +271,33 @@ python -m py_compile backend/app/*.py
 
 ```bash
 cd frontend
-npm install
+npm ci
+npm test
 npm run build
 ```
+
+### İzole integration
+
+```bash
+tests/integration/run.sh
+```
+
+Bu test DLQ/retry/lag/TTL/retention yanında gerçek, izole MongoDB backup ve boş-target restore akışını da doğrular.
+
+### Release statik ve paket doğrulama
+
+```bash
+sh -n scripts/*.sh kafka/init-topics.sh tests/integration/run.sh
+OFFLINE_SKIP_PULL=1 VERSION=v1.0.0-rc.1 PLATFORM=arm64 scripts/build-offline-package.sh
+```
+
+Offline test mimarisi çalışılan Docker host mimarisiyle eşleşmelidir. Release workflow'u iki mimariyi ayrı runner işlerinde üretir.
 
 ### Compose yapılandırması
 
 ```bash
-docker compose config
+docker compose config --quiet
+docker compose -f compose.yaml -f compose.dev.yaml config --quiet
 docker compose config --services
 docker compose ps -a
 ```

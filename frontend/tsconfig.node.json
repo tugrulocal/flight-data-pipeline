@@ -4,6 +4,7 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.node.tsbuildinfo",
     "allowImportingTsExtensions": true,
     "noEmit": true
   },

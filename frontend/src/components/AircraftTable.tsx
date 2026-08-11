@@ -5,6 +5,7 @@ import {
   formatRelativeTime,
   formatSpeed,
 } from "../lib/formatters";
+import { TakeoffIcon } from "./TakeoffIcon";
 
 
 interface AircraftTableProps {
@@ -20,56 +21,55 @@ export function AircraftTable({
   onSelectAircraft,
 }: AircraftTableProps) {
   return (
-    <div className="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Uçuş</th>
-            <th>Durum</th>
-            <th>İrtifa</th>
-            <th>Hız</th>
-            <th>Yön</th>
-            <th>Son sinyal</th>
-          </tr>
-        </thead>
-        <tbody>
-          {aircraft.map((item) => (
-            <tr
-              key={item.icao24}
-              className={
-                selectedIcao24 === item.icao24
-                  ? "selected-row"
-                  : undefined
-              }
-            >
-              <td>
-                <button
-                  type="button"
-                  className="aircraft-link"
-                  onClick={() => onSelectAircraft(item.icao24)}
-                >
-                  <strong>{item.callsign || "Çağrı kodu yok"}</strong>
-                  <span>{item.icao24}</span>
-                </button>
-              </td>
-              <td>
-                <span className={`flight-state ${item.on_ground ? "ground" : "air"}`}>
-                  {item.on_ground ? "Yerde" : "Havada"}
+    <div className="aircraft-list" role="list">
+      {aircraft.map((item) => {
+        const flightState =
+          item.on_ground === true
+            ? "ground"
+            : item.on_ground === false
+              ? "air"
+              : "unknown";
+        const flightStateLabel =
+          item.on_ground === true
+            ? "Yerde"
+            : item.on_ground === false
+              ? "Havada"
+              : "Bilinmiyor";
+
+        return (
+          <button
+            key={item.icao24}
+            type="button"
+            role="listitem"
+            className={`aircraft-list-item ${
+              selectedIcao24 === item.icao24 ? "selected-row" : ""
+            }`}
+            onClick={() => onSelectAircraft(item.icao24)}
+          >
+            <span className="aircraft-list-heading">
+              <span className="aircraft-list-identity">
+                <TakeoffIcon className="takeoff-icon" />
+                <span>
+                <strong>{item.callsign || "Çağrı kodu yok"}</strong>
+                <small>{item.icao24}</small>
                 </span>
-              </td>
-              <td>{formatAltitude(item.baro_altitude_m)}</td>
-              <td>{formatSpeed(item.velocity_mps)}</td>
-              <td>{formatHeading(item.true_track_deg)}</td>
-              <td>{formatRelativeTime(item.observed_at)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </span>
+              <span className={`flight-state ${flightState}`}>
+                {flightStateLabel}
+              </span>
+            </span>
+            <span className="aircraft-list-details">
+              <span>{formatAltitude(item.baro_altitude_m)}</span>
+              <span>{formatSpeed(item.velocity_mps)}</span>
+              <span>{formatHeading(item.true_track_deg)}</span>
+              <span>{formatRelativeTime(item.observed_at)}</span>
+            </span>
+          </button>
+        );
+      })}
 
       {aircraft.length === 0 && (
-        <div className="empty-state">
-          Filtreyle eşleşen uçak bulunamadı.
-        </div>
+        <div className="empty-state">Filtreyle eşleşen uçak bulunamadı.</div>
       )}
     </div>
   );

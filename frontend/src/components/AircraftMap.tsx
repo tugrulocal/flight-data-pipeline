@@ -3,20 +3,13 @@ import {
   useMemo,
   useRef,
 } from "react";
-import type { CSSProperties } from "react";
 import L from "leaflet";
 
 import type { Aircraft } from "../types";
-import {
-  formatAltitude,
-  formatDateTime,
-  formatHeading,
-  formatSpeed,
-} from "../lib/formatters";
-import {
-  ALTITUDE_LEGEND,
-  altitudeColor,
-} from "../lib/altitudeColors";
+import { aircraftPopupHtml } from "../lib/aircraftPopup";
+import { altitudeColor } from "../lib/altitudeColors";
+import { AltitudeLegend } from "./MapOverlays";
+import type { RouteStatus } from "./MapOverlays";
 
 
 const INITIAL_CENTER: L.LatLngExpression = [39.0, 35.5];
@@ -32,7 +25,7 @@ interface AircraftMapProps {
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | null;
   selectedRoute: Aircraft[];
-  routeStatus: "idle" | "loading" | "ready" | "empty" | "error";
+  routeStatus: RouteStatus;
   onSelectAircraft: (icao24: string | null) => void;
 }
 
@@ -45,50 +38,8 @@ function hasValidPosition(item: Aircraft) {
 }
 
 
-function escapeHtml(value: string | null | undefined) {
-  return (value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
 function routeSegmentColor(item: Aircraft) {
   return altitudeColor(item);
-}
-
-
-function popupHtml(item: Aircraft) {
-  const title = escapeHtml(item.callsign || item.icao24);
-  const country = escapeHtml(item.origin_country || "Bilinmiyor");
-  const observedAt = escapeHtml(formatDateTime(item.observed_at));
-
-  return `
-    <div class="aircraft-popup">
-      <strong>${title}</strong>
-      <span>${country}</span>
-      <dl>
-        <div>
-          <dt>İrtifa</dt>
-          <dd>${formatAltitude(item.baro_altitude_m)}</dd>
-        </div>
-        <div>
-          <dt>Hız</dt>
-          <dd>${formatSpeed(item.velocity_mps)}</dd>
-        </div>
-        <div>
-          <dt>Yön</dt>
-          <dd>${formatHeading(item.true_track_deg)}</dd>
-        </div>
-        <div>
-          <dt>Son görülme</dt>
-          <dd>${observedAt}</dd>
-        </div>
-      </dl>
-    </div>
-  `;
 }
 
 
@@ -275,7 +226,7 @@ export function AircraftMap({
         riseOnHover: true,
       });
 
-      marker.bindPopup(popupHtml(item), {
+      marker.bindPopup(aircraftPopupHtml(item), {
         className: "aircraft-leaflet-popup",
         closeButton: true,
         offset: [0, -8],
@@ -309,38 +260,7 @@ export function AircraftMap({
     >
       <div ref={containerRef} className="leaflet-map" />
 
-      {selectedAircraft && (
-        <div className={`route-status ${routeStatus}`}>
-          <strong>{selectedAircraft.callsign || selectedAircraft.icao24}</strong>
-          <span>
-            {routeStatus === "loading" && "Rota yükleniyor…"}
-            {routeStatus === "ready"
-              && `${selectedRoute.length} nokta ile irtifa renkli rota`}
-            {routeStatus === "empty"
-              && "Rota için yeterli geçmiş nokta yok"}
-            {routeStatus === "error" && "Rota alınamadı"}
-            {routeStatus === "idle" && "Uçak seçildi"}
-          </span>
-        </div>
-      )}
-
-      <div
-        className="altitude-legend"
-        aria-label="İrtifaya göre uçak renkleri"
-      >
-        <strong>Altıtude (ft)</strong>
-        <div className="altitude-legend-grid">
-          {ALTITUDE_LEGEND.filter((item) => !("hiddenFromScale" in item)).map((item) => (
-            <span key={item.key}>
-              <i
-                className="legend-swatch"
-                style={{ "--legend-color": item.color } as CSSProperties}
-              />
-              {item.label}
-            </span>
-          ))}
-        </div>
-      </div>
+      <AltitudeLegend />
     </div>
   );
 }
