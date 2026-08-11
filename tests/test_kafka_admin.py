@@ -1,6 +1,12 @@
 import pytest
 
-from kafka.admin import TopicSpec, positive_integer, topic_specs
+from kafka import admin
+from kafka.admin import (
+    TopicSpec,
+    positive_integer,
+    reconcile_topics_with_retry,
+    topic_specs,
+)
 
 
 def test_topic_spec_contains_required_retention_config():
@@ -44,3 +50,59 @@ def test_topic_specs_use_release_defaults(monkeypatch):
         2_592_000_000,
         1_073_741_824,
     )
+
+
+def test_topic_reconcile_retries_transient_startup_error(monkeypatch):
+    attempts = []
+    configured = []
+    verified = []
+
+    def create_topics(_client, _specs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise RuntimeError("controller henüz hazır değil")
+
+    monkeypatch.setattr(admin, "create_topics", create_topics)
+    monkeypatch.setattr(
+        admin,
+        "configure_topics",
+        lambda _client, _specs: configured.append(1),
+    )
+    monkeypatch.setattr(
+        admin,
+        "verify_topics",
+        lambda _client, _specs: verified.append(1),
+    )
+
+    reconcile_topics_with_retry(
+        object(),
+        (TopicSpec("events", 60_000, 1_048_576),),
+        mutate=True,
+        max_attempts=3,
+        backoff_seconds=0,
+    )
+
+    assert len(attempts) == 2
+    assert configured == [1]
+    assert verified == [1]
+
+
+def test_topic_reconcile_fails_after_bounded_attempts(monkeypatch):
+    attempts = []
+
+    def fail_verification(_client, _specs):
+        attempts.append(1)
+        raise RuntimeError("config henüz görünmüyor")
+
+    monkeypatch.setattr(admin, "verify_topics", fail_verification)
+
+    with pytest.raises(RuntimeError, match="3 denemede tamamlanamadı"):
+        reconcile_topics_with_retry(
+            object(),
+            (TopicSpec("events", 60_000, 1_048_576),),
+            mutate=False,
+            max_attempts=3,
+            backoff_seconds=0,
+        )
+
+    assert len(attempts) == 3

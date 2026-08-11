@@ -18,15 +18,27 @@ fail() {
   exit 1
 }
 
-cleanup() {
+cleanup_resources() {
   # Yalnız sabit isimli izole test projesinin geçici kaynaklarını temizler.
   dc down --volumes --remove-orphans >/dev/null 2>&1 || true
   if [ -n "${backup_probe:-}" ] && [ -f "$backup_probe" ]; then
     find "$backup_probe" -delete
   fi
 }
-trap cleanup EXIT INT TERM
-cleanup
+
+on_exit() {
+  exit_code=$?
+  trap - EXIT INT TERM
+  if [ "$exit_code" -ne 0 ]; then
+    printf 'Integration diagnostic: container durumları ve son servis logları\n' >&2
+    dc ps -a >&2 || true
+    dc logs --no-color --tail=200 kafka topic-init mongodb consumer backend frontend >&2 || true
+  fi
+  cleanup_resources
+  exit "$exit_code"
+}
+trap on_exit EXIT INT TERM
+cleanup_resources
 
 dc up -d --build consumer backend frontend
 

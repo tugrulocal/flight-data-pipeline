@@ -146,6 +146,46 @@ def verify_topics(client: AdminClient, specs: tuple[TopicSpec, ...]) -> None:
         )
 
 
+def reconcile_topics_with_retry(
+    client: AdminClient,
+    specs: tuple[TopicSpec, ...],
+    *,
+    mutate: bool,
+    max_attempts: int = 10,
+    backoff_seconds: float = 2,
+) -> None:
+    """Broker startup races may outlive the first successful metadata request."""
+    last_error: KafkaException | RuntimeError | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            if mutate:
+                create_topics(client, specs)
+                configure_topics(client, specs)
+            verify_topics(client, specs)
+            return
+        except (KafkaException, RuntimeError) as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                break
+            print(
+                json.dumps(
+                    {
+                        "event": "topic.retry",
+                        "attempt": attempt,
+                        "max_attempts": max_attempts,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    },
+                    sort_keys=True,
+                ),
+                file=sys.stderr,
+            )
+            time.sleep(backoff_seconds)
+    raise RuntimeError(
+        f"Kafka topic işlemi {max_attempts} denemede tamamlanamadı: {last_error}"
+    )
+
+
 def print_consumer_group_lag(client: AdminClient, group_id: str) -> None:
     future = client.list_consumer_group_offsets(
         [ConsumerGroupTopicPartitions(group_id)], request_timeout=15
@@ -196,10 +236,11 @@ def main() -> int:
             print_consumer_group_lag(client, sys.argv[2])
         elif command in {"init", "topics"}:
             specs = topic_specs()
-            if command == "init":
-                create_topics(client, specs)
-                configure_topics(client, specs)
-            verify_topics(client, specs)
+            reconcile_topics_with_retry(
+                client,
+                specs,
+                mutate=command == "init",
+            )
         else:
             raise ValueError("Komut init, topics veya group olmalı")
         return 0
