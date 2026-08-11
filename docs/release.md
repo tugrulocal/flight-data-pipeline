@@ -7,9 +7,11 @@ Tag workflow'u:
 - Etiket biçimini doğrular ve ortak CI test/audit/integration kapısını çalıştırır.
 - Release kapısında dört uygulama image'ına ek olarak resmî Kafka/MongoDB image'larını tarar.
 - Dört uygulama için `linux/amd64` ve `linux/arm64` OCI image üretir.
-- GHCR'a sürümlü tag ile gönderir ve package görünürlüğünü public yapar.
+- GHCR'a sürümlü tag ile gönderir ve image'ın anonim olarak indirilebildiğini doğrular.
 - SPDX SBOM, SLSA provenance ve OIDC tabanlı keyless Cosign imzası üretir.
 - İki mimari için image, Compose, `.env.example`, kurulum scriptleri ve doküman içeren checksum'lı offline paket üretir.
+
+Kişisel hesap altında ilk kez oluşturulan GHCR package varsayılan olarak private'dır. GitHub görünürlük değişikliğini resmî REST API üzerinden sunmadığı için ilk yayında package sayfasında bir kez `Package settings → Danger Zone → Change visibility → Public` seçilmelidir. Workflow image'ı ve imzayı yükledikten sonra bu işlemin tamamlanması için 15 dakika bekler ve anonim manifest erişimini doğrulamadan offline/release aşamasına geçmez. Package public olduktan sonra sonraki sürümlerde bu adım tekrarlanmaz.
 
 ## Offline kurulum
 

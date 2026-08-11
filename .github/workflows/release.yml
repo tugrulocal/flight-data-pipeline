@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Yayını tamamlanacak mevcut v* etiketi"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -10,6 +16,8 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/flight-data-pipeline
+  RELEASE_VERSION: ${{ inputs.release_ref || github.ref_name }}
+  RELEASE_REF: ${{ inputs.release_ref || github.ref }}
 
 jobs:
   validate-tag:
@@ -17,7 +25,7 @@ jobs:
     steps:
       - name: Sürüm etiketini doğrula
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ env.RELEASE_VERSION }}
         run: |
           case "$VERSION" in
             v[0-9]*.[0-9]*.[0-9]*|v[0-9]*.[0-9]*.[0-9]*-rc.[0-9]*) ;;
@@ -44,6 +52,11 @@ jobs:
         service: [producer, consumer, backend, frontend]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
+      - id: source
+        name: Kaynak commit'i belirle
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -55,7 +68,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
-          tags: type=semver,pattern={{version}}
+          tags: type=semver,pattern={{version}},value=${{ env.RELEASE_VERSION }}
       - id: build
         uses: docker/build-push-action@v6
         with:
@@ -66,8 +79,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ github.ref_name }}
-            VCS_REF=${{ github.sha }}
+            APP_VERSION=${{ env.RELEASE_VERSION }}
+            VCS_REF=${{ steps.source.outputs.sha }}
           sbom: true
           provenance: mode=max
       - uses: actions/attest-build-provenance@v2
@@ -78,19 +91,31 @@ jobs:
       - uses: sigstore/cosign-installer@v3
       - name: Keyless Cosign imzası
         run: cosign sign --yes "${IMAGE_PREFIX}-${{ matrix.service }}@${{ steps.build.outputs.digest }}"
-      - name: GHCR package'ını public yap
+      - name: Public GHCR erişimini doğrula
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
-          OWNER_TYPE: ${{ github.event.repository.owner.type }}
           PACKAGE: flight-data-pipeline-${{ matrix.service }}
+          VERSION: ${{ env.RELEASE_VERSION }}
         run: |
-          if [ "$OWNER_TYPE" = "Organization" ]; then
-            endpoint="/orgs/$OWNER/packages/container/$PACKAGE"
-          else
-            endpoint="/user/packages/container/$PACKAGE"
-          fi
-          gh api --method PATCH "$endpoint" -f visibility=public
+          image_tag="${VERSION#v}"
+          for attempt in $(seq 1 90); do
+            anonymous_token=$(curl -sSL "https://ghcr.io/token?scope=repository:$OWNER/$PACKAGE:pull" | jq -r '.token // empty' || true)
+            http_status="token-denied"
+            if [ -n "$anonymous_token" ]; then
+              http_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+                -H "Authorization: Bearer $anonymous_token" \
+                -H 'Accept: application/vnd.oci.image.index.v1+json' \
+                "https://ghcr.io/v2/$OWNER/$PACKAGE/manifests/$image_tag")
+            fi
+            if [ "$http_status" = "200" ]; then
+              echo "$PACKAGE:$image_tag anonim olarak indirilebilir."
+              exit 0
+            fi
+            echo "Public erişim bekleniyor ($attempt/90, sonuç: $http_status)."
+            sleep 10
+          done
+          echo "$PACKAGE package'ı 15 dakika içinde public erişime açılmadı." >&2
+          exit 1
 
   offline:
     needs: publish
@@ -103,6 +128,8 @@ jobs:
         platform: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/login-action@v3
         with:
@@ -111,7 +138,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Platform image'larını indir ve paketle
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ env.RELEASE_VERSION }}
           PLATFORM: ${{ matrix.platform }}
         run: scripts/build-offline-package.sh
       - uses: actions/upload-artifact@v4
@@ -132,6 +159,7 @@ jobs:
           path: release-out
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_VERSION }}
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-rc.') }}
+          prerelease: ${{ contains(env.RELEASE_VERSION, '-rc.') }}
           files: release-out/*
