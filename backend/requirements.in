@@ -1,5 +1,5 @@
 confluent-kafka==2.12.1
 fastapi==0.140.13
 pymongo==4.17.0
-uvicorn==0.52.0
+uvicorn==0.52.1
 websockets==17.0.1
