@@ -155,6 +155,9 @@ def test_ci_scans_both_architectures_with_safe_pinned_trivy_action():
     assert "aquasecurity/trivy-action@0.33.1" not in workflow
     assert workflow.count(safe_trivy_action) == 6
     assert workflow.count("platform: [amd64, arm64]") == 2
+    assert "runner: ubuntu-latest" in workflow
+    assert "runner: ubuntu-24.04-arm" in workflow
+    assert "runs-on: ${{ matrix.runner }}" in workflow
     assert "TRIVY_PLATFORM: linux/${{ matrix.platform }}" in workflow
     assert "image-ref: flight-data-pipeline-backend:ci-${{ matrix.platform }}" in workflow
     assert "image-ref: apache/kafka-native:4.3.1@sha256:" in workflow
