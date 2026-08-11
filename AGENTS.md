@@ -224,10 +224,9 @@ Yeni mesajlarda producer'ın bir kez ürettiği UUID `event_id`, legacy mesajlar
 
 ## Sıradaki işler
 
-1. Kullanıcı açıkça istemeden commit/push/tag oluşturma. Onaydan sonra güncel CI değişikliklerini push et ve AMD64/ARM64 güvenlik kapısının GitHub Actions üzerinde geçtiğini doğrula.
-2. CI geçince aynı commit'i `v1.0.0-rc.2` olarak yayınla; GHCR manifest, SBOM, provenance, Cosign ve offline release artifact'larını doğrula.
-3. `docs/release-acceptance.md` içindeki Windows AMD64, macOS ARM64/Intel ve Linux AMD64/ARM64 matrisini gerçek makinelerde tamamla.
-4. Bütün kabul satırları geçerse aynı commit'i `v1.0.0` olarak etiketle.
+1. `v1.0.0-rc.2` GHCR image'ları, SBOM/provenance/Cosign imzaları ve AMD64/ARM64 offline paketleri yayımlandı; release adayı üzerinde yeni uygulama değişikliği yapılmamalıdır.
+2. `docs/release-acceptance.md` içindeki Windows AMD64, macOS ARM64/Intel ve Linux AMD64/ARM64 matrisini gerçek makinelerde tamamla.
+3. Bütün kabul satırları geçerse uygulama commit'i `e347e0c91c71c6677176e76b896f538ce109e5f8` için kullanıcı onayıyla `v1.0.0` etiketi oluştur; kullanıcı istemeden tag/push yapma.
 
 ## Beklenen proje yapısı
 
