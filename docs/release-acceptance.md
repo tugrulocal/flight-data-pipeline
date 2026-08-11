@@ -19,6 +19,7 @@ macOS ARM64 geliştirme makinesinde release öncesi teknik kapı tamamlandı:
 - İzole integration testi duplicate/idempotency, DLQ, Mongo kesintisi ve backlog recovery, lag, TTL, retention, IXSCAN ve backup/boş restore senaryolarıyla geçti.
 - Çalışan release Compose `127.0.0.1:5175` üzerinde sağlıklı; iki consumer group için `total_lag: 0` görüldü ve son 20 dakikalık veride Türkiye kutusu dışında kayıtlar bulundu.
 - ARM64 offline paketinin hem dış arşiv checksum'u hem paket içi image/kurulum checksum'ları doğrulandı.
+- `v1.0.0-rc.2` temiz named volume testinde Kafka data directory izin hatası verdiği için kabul edilmedi. `v1.0.0-rc.3`, non-root Kafka'yı koruyan `kafka-volume-init` düzeltmesiyle tekrar doğrulanmalıdır.
 
 Bu ön-kabul fiziksel hedef tablosunun yerine geçmez. Özellikle registry'den temiz kurulum ve offline paketten gerçek kurulum, kullanıcı verisi olmayan bağımsız makinelerde ayrıca yapılmalıdır.
 
@@ -33,4 +34,4 @@ Bu ön-kabul fiziksel hedef tablosunun yerine geçmez. Özellikle registry'den t
 7. `backup-mongodb.sh` ile `.jsonl.gz` export al; consumer durdurulmuş boş hedefte restore et ve Mongo sayımlarını karşılaştır.
 8. `.env` içindeki `APP_VERSION` değerini bir önceki sürüme alarak rollback image'larının çekilebildiğini doğrula. Mongo şeması geri uyumlu değilse önceden alınmış uygulama verisi export'u ile geri dönüş yolunu ayrıca dene.
 
-`v1.0.0-rc.2` yalnız bütün satırlar geçtiğinde aynı commit üzerinde `v1.0.0` olarak etiketlenebilir. Kafka retention nedeniyle süresi dolmuş kayıtların Mongo export ile geri getirilemeyeceği release notunda korunur.
+`v1.0.0-rc.3` yalnız bütün satırlar geçtiğinde aynı commit üzerinde `v1.0.0` olarak etiketlenebilir. Kafka retention nedeniyle süresi dolmuş kayıtların Mongo export ile geri getirilemeyeceği release notunda korunur.

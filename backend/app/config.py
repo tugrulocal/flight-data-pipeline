@@ -47,7 +47,7 @@ def load_settings():
     )
 
     return Settings(
-        app_version=os.getenv("APP_VERSION", "1.0.0-rc.2"),
+        app_version=os.getenv("APP_VERSION", "1.0.0-rc.3"),
         mongodb_uri=os.getenv(
             "MONGODB_URI",
             "mongodb://localhost:27017",

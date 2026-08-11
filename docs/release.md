@@ -1,6 +1,6 @@
 # Release ve offline dağıtım
 
-Release sırası aynı commit üzerinde `v1.0.0-rc.2` kabul adayı, kabul matrisi tamamlanınca `v1.0.0` etiketidir. `latest` etiketi çalıştırma için gerekmez.
+Release sırası aynı commit üzerinde `v1.0.0-rc.3` kabul adayı, kabul matrisi tamamlanınca `v1.0.0` etiketidir. `latest` etiketi çalıştırma için gerekmez.
 
 Tag workflow'u:
 
@@ -27,6 +27,8 @@ Kişisel hesap altında ilk kez oluşturulan GHCR package varsayılan olarak pri
 5. Setup servisleri otomatik başlatır ve 5175 adresindeki health kontrolünü doğrular. OpenSky credentials isteğe bağlıdır.
 
 Kurulum scripti Docker/Compose, Linux container modu, CPU mimarisi, en az 4 GB Docker belleği, frontend portu ve Türkiye/global moda göre 10/30 GB boş diski kontrol eder. `.env` yoksa global örnekten üretir; secret değerlerini yazdırmaz. Offline archive varsa bütün Compose image'larının gerçekten yüklenmiş olduğunu doğrular; yoksa public GHCR image'larını indirir.
+
+Kafka native image'ı non-root `appuser` ile çalışır. Yeni Docker volume'ları root sahibi oluşabildiği için Compose, broker başlamadan önce yalnız Kafka data volume kökünü `uid:gid 1000:1000` yapan tek seferlik `kafka-volume-init` servisini çalıştırır. Broker bundan sonra yine non-root çalışır.
 
 ## Registry kurulumu ve doğrulama
 

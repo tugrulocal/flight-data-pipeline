@@ -224,9 +224,9 @@ Yeni mesajlarda producer'ın bir kez ürettiği UUID `event_id`, legacy mesajlar
 
 ## Sıradaki işler
 
-1. `v1.0.0-rc.2` GHCR image'ları, SBOM/provenance/Cosign imzaları ve AMD64/ARM64 offline paketleri yayımlandı; release adayı üzerinde yeni uygulama değişikliği yapılmamalıdır.
-2. `docs/release-acceptance.md` içindeki Windows AMD64, macOS ARM64/Intel ve Linux AMD64/ARM64 matrisini gerçek makinelerde tamamla.
-3. Bütün kabul satırları geçerse uygulama commit'i `e347e0c91c71c6677176e76b896f538ce109e5f8` için kullanıcı onayıyla `v1.0.0` etiketi oluştur; kullanıcı istemeden tag/push yapma.
+1. `v1.0.0-rc.2` image ve offline paketleri yayımlandı ancak temiz Kafka volume izin hatası nedeniyle kabul edilmedi; bu etiket değiştirilmemelidir.
+2. `v1.0.0-rc.3` için `kafka-volume-init` ile temiz-volume offline/registry testini, GHCR manifest/SBOM/provenance/Cosign doğrulamasını ve `docs/release-acceptance.md` matrisini tamamla.
+3. Bütün kabul satırları geçerse `v1.0.0-rc.3` uygulama commit'i için kullanıcı onayıyla `v1.0.0` etiketi oluştur; kullanıcı istemeden tag/push yapma.
 
 ## Beklenen proje yapısı
 
@@ -291,7 +291,7 @@ Bu test DLQ/retry/lag/TTL/retention yanında gerçek, izole MongoDB backup ve bo
 
 ```bash
 sh -n scripts/*.sh tests/integration/run.sh
-OFFLINE_SKIP_PULL=1 VERSION=v1.0.0-rc.2 PLATFORM=arm64 scripts/build-offline-package.sh
+OFFLINE_SKIP_PULL=1 VERSION=v1.0.0-rc.3 PLATFORM=arm64 scripts/build-offline-package.sh
 ```
 
 Offline test mimarisi çalışılan Docker host mimarisiyle eşleşmelidir. Release workflow'u iki mimariyi ayrı runner işlerinde üretir.

@@ -17,7 +17,7 @@ from backend.app.websocket_manager import WebSocketManager
 def test_backend_settings_include_runtime_window():
     settings = load_settings()
     assert settings.live_position_window_minutes == 20
-    assert settings.app_version == "1.0.0-rc.2"
+    assert settings.app_version == "1.0.0-rc.3"
 
 
 def test_backend_default_origins_follow_runtime_app_port(monkeypatch):

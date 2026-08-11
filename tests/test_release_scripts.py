@@ -114,15 +114,24 @@ def test_release_defaults_are_global_and_consistent():
     assert values["POLL_INTERVAL_SECONDS"] == "120"
     assert values["LIVE_POSITION_WINDOW_MINUTES"] == "20"
     assert values["APP_PORT"] == "5175"
-    assert values["APP_VERSION"] == "1.0.0-rc.2"
+    assert values["APP_VERSION"] == "1.0.0-rc.3"
 
     compose = (ROOT / "compose.yaml").read_text()
     assert "${OPENSKY_AREA_MODE:-global}" in compose
     assert "${POLL_INTERVAL_SECONDS:-120}" in compose
     assert "${LIVE_POSITION_WINDOW_MINUTES:-20}" in compose
     assert "${APP_PORT:-5175}" in compose
-    assert "${APP_VERSION:-1.0.0-rc.2}" in compose
+    assert "${APP_VERSION:-1.0.0-rc.3}" in compose
     assert not (ROOT / "compose.global.yaml").exists()
+
+
+def test_kafka_clean_volume_is_prepared_without_running_broker_as_root():
+    compose = (ROOT / "compose.yaml").read_text()
+
+    assert "kafka-volume-init:" in compose
+    assert 'user: "0:0"' in compose
+    assert 'command: ["chown 1000:1000 /var/lib/kafka/data"]' in compose
+    assert "kafka-volume-init:\n        condition: service_completed_successfully" in compose
 
 
 def test_python_images_use_pinned_alpine_and_native_kafka_versions():

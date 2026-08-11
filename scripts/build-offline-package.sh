@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-: "${VERSION:?VERSION gerekli (örnek: v1.0.0-rc.2)}"
+: "${VERSION:?VERSION gerekli (örnek: v1.0.0-rc.3)}"
 : "${PLATFORM:?PLATFORM gerekli (amd64 veya arm64)}"
 case "$PLATFORM" in amd64|arm64) ;; *) exit 2 ;; esac
 echo "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || {
@@ -63,7 +63,7 @@ cp compose.yaml .env.example README.md SECURITY.md THIRD_PARTY_NOTICES.md "$stag
 cp scripts/setup.sh scripts/setup.ps1 scripts/backup-mongodb.sh scripts/restore-mongodb.sh "$stage/scripts/"
 cp docs/operations.md docs/global-mode.md docs/backup-restore.md docs/release.md docs/release-acceptance.md "$stage/docs/"
 for versioned_file in "$stage/compose.yaml" "$stage/.env.example"; do
-  sed "s/1.0.0-rc.2/${version_number}/g" "$versioned_file" > "${versioned_file}.tmp"
+  sed "s/1.0.0-rc.3/${version_number}/g" "$versioned_file" > "${versioned_file}.tmp"
   mv "${versioned_file}.tmp" "$versioned_file"
 done
 
