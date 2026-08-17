@@ -1,7 +1,11 @@
 apiVersion: v1
 kind: Service
+m# k8s/lesson-05/frontend-service.yaml
+kind: Service
 metadata:
   name: frontend
+  annotations:
+    training.flight-data-pipeline.dev/gitops-demo: "v1"
 spec:
   type: ClusterIP
   selector:
