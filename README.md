@@ -88,4 +88,22 @@ MapLibre varsayılandır. WebGL yoksa, harita kurulamazsa veya context kaybolurs
 - [Üçüncü taraf bildirimleri](THIRD_PARTY_NOTICES.md)
 - [Güvenlik politikası ve RC kapısı](SECURITY.md)
 
+## Kubernetes öğrenme yolu
+
+Bu proje içinde Kubernetes derslerini sırayla okumak, kavramları daha rahat oturtur:
+
+1. [Kubernetes'e ilk adım](k8s/lesson-01/README.md)
+1. [Kubernetes ders 02](k8s/lesson-02/README.md)
+1. [Kubernetes ders 03](k8s/lesson-03/README.md)
+1. [Kubernetes ders 04](k8s/lesson-04/README.md)
+1. [Kubernetes ders 05](k8s/lesson-05/README.md)
+
+Kısa rehber:
+
+- Ders 01: cluster, namespace ve temel servisler.
+- Ders 02: Kafka ve topic hazırlığı.
+- Ders 03: producer ve consumer.
+- Ders 04: backend, frontend ve Ingress.
+- Ders 05: bütün sistemin birlikte çalışması.
+
 Proje localhost eğitimi içindir. LAN erişimi, kullanıcı hesabı, TLS ve internetten yayın v1.0 kapsamı dışındadır. Çalışma sırasında OpenSky ve harita tile'ları için internet gerekir.

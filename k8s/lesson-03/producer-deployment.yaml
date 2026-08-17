@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+        - name: producer
+          image: ghcr.io/tugrulocal/flight-data-pipeline-producer:v1.0.0-rc.3
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: producer-config
+          # Bu container'a Service vermiyoruz, çünkü içeriden dışarı konuşuyor.
+          # OpenSky'dan veri alır ve Kafka'ya yollar; dış istemci onu çağırmaz.

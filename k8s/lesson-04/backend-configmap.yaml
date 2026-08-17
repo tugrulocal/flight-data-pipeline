@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  # Backend burada Kubernetes içindeki servis isimleriyle konuşur.
+  # Frontend aynı origin üzerinden geldiği için CORS listesine ingress adresini
+  # de eklemek gerekir.
+  APP_VERSION: v1.0.0-rc.3
+  APP_PORT: "8000"
+  MONGODB_URI: mongodb://mongodb:27017
+  MONGODB_DATABASE: flightdb
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  KAFKA_TOPIC: aircraft.positions.raw.v1
+  KAFKA_REALTIME_CONSUMER_GROUP: flight-realtime-gateway-v1
+  LIVE_POSITION_WINDOW_MINUTES: "20"
+  WEBSOCKET_BATCH_INTERVAL_MS: "250"
+  WEBSOCKET_BATCH_MAX_SIZE: "500"
+  CORS_ORIGINS: http://flight-data-pipeline.local,http://localhost:5175,http://127.0.0.1:5175

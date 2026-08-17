@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: flight-data-pipeline
+
+resources:
+  - namespace.yaml
+  - producer-configmap.yaml
+  - consumer-configmap.yaml
+  - producer-deployment.yaml
+  - consumer-deployment.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: flight-data-pipeline
+      app.kubernetes.io/version: v1.0.0-rc.3
+    includeSelectors: false
+    includeTemplates: true

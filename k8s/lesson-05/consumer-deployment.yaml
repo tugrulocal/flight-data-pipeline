@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+    spec:
+      containers:
+        - name: consumer
+          image: ghcr.io/tugrulocal/flight-data-pipeline-consumer:v1.0.0-rc.3
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: consumer-config

@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-init
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: topic-init
+          image: ghcr.io/tugrulocal/flight-data-pipeline-producer:v1.0.0-rc.3
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /app/kafka_admin.py
+            - init
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:29092
+            - name: KAFKA_TOPIC
+              value: aircraft.positions.raw.v1
+            - name: KAFKA_DLQ_TOPIC
+              value: aircraft.positions.dlq.v1
+            - name: KAFKA_RAW_RETENTION_MS
+              value: "172800000"
+            - name: KAFKA_RAW_RETENTION_BYTES
+              value: "10737418240"
+            - name: KAFKA_DLQ_RETENTION_MS
+              value: "2592000000"
+            - name: KAFKA_DLQ_RETENTION_BYTES
+              value: "1073741824"

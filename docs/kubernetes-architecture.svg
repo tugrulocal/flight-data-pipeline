@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
+  <title id="title">Flight Data Pipeline Kubernetes mimarisi</title>
+  <desc id="desc">Docker Desktop Kubernetes cluster içindeki Ingress, frontend, backend, Kafka, MongoDB, producer, consumer ve kalıcı disk bağlantıları.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#334155"/></marker>
+    <marker id="greenArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#047857"/></marker>
+    <marker id="purpleArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#7e22ce"/></marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .title { font-size: 34px; font-weight: 700; }
+      .subtitle { font-size: 17px; fill: #475569; }
+      .section { font-size: 18px; font-weight: 700; fill: #334155; }
+      .kind { font-size: 15px; font-weight: 700; fill: #475569; }
+      .name { font-size: 22px; font-weight: 700; }
+      .detail { font-size: 15px; fill: #334155; }
+      .label { font-size: 14px; font-weight: 600; fill: #334155; }
+      .cluster { fill: #f8fafc; stroke: #64748b; stroke-width: 2; }
+      .namespace { fill: #eff6ff; stroke: #93c5fd; stroke-width: 2; stroke-dasharray: 8 6; }
+      .box { stroke-width: 2; rx: 14; }
+      .ingress { fill: #fff7ed; stroke: #f97316; }
+      .service { fill: #e0f2fe; stroke: #0284c7; }
+      .deployment { fill: #ecfdf5; stroke: #059669; }
+      .stateful { fill: #f5f3ff; stroke: #7c3aed; }
+      .job { fill: #fefce8; stroke: #ca8a04; }
+      .pvc { fill: #fdf2f8; stroke: #db2777; }
+      .external { fill: #fff; stroke: #64748b; stroke-width: 2; rx: 14; }
+      .line { fill: none; stroke: #334155; stroke-width: 2.5; marker-end: url(#arrow); }
+      .data { fill: none; stroke: #047857; stroke-width: 3; marker-end: url(#greenArrow); }
+      .live { fill: none; stroke: #7e22ce; stroke-width: 3; marker-end: url(#purpleArrow); }
+      .dashed { fill: none; stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 7 6; marker-end: url(#purpleArrow); }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1180" fill="#ffffff"/>
+  <text x="70" y="58" class="title">Flight Data Pipeline — Kubernetes Mimarisi</text>
+  <text x="70" y="86" class="subtitle">Yerel Docker Desktop cluster · namespace: flight-data-pipeline · lesson-05 manifestleri</text>
+
+  <rect x="320" y="125" width="1410" height="965" rx="24" class="cluster"/>
+  <text x="350" y="164" class="section">Docker Desktop Kubernetes cluster</text>
+  <rect x="345" y="185" width="1360" height="875" rx="18" class="namespace"/>
+  <text x="375" y="218" class="section">namespace: flight-data-pipeline</text>
+
+  <rect x="55" y="250" width="205" height="105" class="external"/>
+  <text x="157" y="290" text-anchor="middle" class="kind">Kullanıcı</text>
+  <text x="157" y="320" text-anchor="middle" class="name">Tarayıcı</text>
+  <text x="157" y="343" text-anchor="middle" class="detail">flight-data-pipeline.local</text>
+
+  <rect x="55" y="675" width="205" height="105" class="external"/>
+  <text x="157" y="715" text-anchor="middle" class="kind">Dış servis</text>
+  <text x="157" y="745" text-anchor="middle" class="name">OpenSky API</text>
+  <text x="157" y="768" text-anchor="middle" class="detail">REST uçuş verisi</text>
+
+  <rect x="405" y="260" width="230" height="105" class="box ingress"/>
+  <text x="520" y="292" text-anchor="middle" class="kind">Ingress</text>
+  <text x="520" y="321" text-anchor="middle" class="name">flight-data-pipeline</text>
+  <text x="520" y="345" text-anchor="middle" class="detail">/ → frontend:80</text>
+
+  <rect x="720" y="260" width="210" height="105" class="box service"/>
+  <text x="825" y="292" text-anchor="middle" class="kind">Service · ClusterIP</text>
+  <text x="825" y="321" text-anchor="middle" class="name">frontend :80</text>
+  <text x="825" y="345" text-anchor="middle" class="detail">sabit iç ağ adı</text>
+
+  <rect x="1015" y="245" width="270" height="135" class="box deployment"/>
+  <text x="1150" y="278" text-anchor="middle" class="kind">Deployment · 1 pod</text>
+  <text x="1150" y="309" text-anchor="middle" class="name">frontend</text>
+  <text x="1150" y="334" text-anchor="middle" class="detail">Nginx + React</text>
+  <text x="1150" y="357" text-anchor="middle" class="detail">frontend-nginx-config</text>
+
+  <rect x="1390" y="260" width="210" height="105" class="box service"/>
+  <text x="1495" y="292" text-anchor="middle" class="kind">Service · ClusterIP</text>
+  <text x="1495" y="321" text-anchor="middle" class="name">backend :8000</text>
+  <text x="1495" y="345" text-anchor="middle" class="detail">sabit iç ağ adı</text>
+
+  <rect x="1390" y="445" width="270" height="145" class="box deployment"/>
+  <text x="1525" y="478" text-anchor="middle" class="kind">Deployment · 1 pod</text>
+  <text x="1525" y="509" text-anchor="middle" class="name">backend</text>
+  <text x="1525" y="534" text-anchor="middle" class="detail">FastAPI · REST · WebSocket</text>
+  <text x="1525" y="558" text-anchor="middle" class="detail">group: flight-realtime-gateway-v1</text>
+  <text x="1525" y="580" text-anchor="middle" class="detail">backend-config</text>
+
+  <rect x="405" y="660" width="250" height="125" class="box deployment"/>
+  <text x="530" y="694" text-anchor="middle" class="kind">Deployment · 1 pod</text>
+  <text x="530" y="725" text-anchor="middle" class="name">producer</text>
+  <text x="530" y="750" text-anchor="middle" class="detail">OpenSky sorgular → Kafka</text>
+  <text x="530" y="773" text-anchor="middle" class="detail">producer-config</text>
+
+  <rect x="730" y="650" width="220" height="100" class="box job"/>
+  <text x="840" y="682" text-anchor="middle" class="kind">Job · bir kez</text>
+  <text x="840" y="713" text-anchor="middle" class="name">kafka-topic-init</text>
+  <text x="840" y="736" text-anchor="middle" class="detail">raw + DLQ topic</text>
+
+  <rect x="1015" y="630" width="270" height="145" class="box deployment"/>
+  <text x="1150" y="663" text-anchor="middle" class="kind">Deployment · 1 pod</text>
+  <text x="1150" y="694" text-anchor="middle" class="name">consumer</text>
+  <text x="1150" y="719" text-anchor="middle" class="detail">MongoDB writer</text>
+  <text x="1150" y="743" text-anchor="middle" class="detail">group: flight-mongodb-writer-v1</text>
+  <text x="1150" y="765" text-anchor="middle" class="detail">consumer-config</text>
+
+  <rect x="700" y="870" width="225" height="100" class="box service"/>
+  <text x="812" y="902" text-anchor="middle" class="kind">Service · ClusterIP</text>
+  <text x="812" y="933" text-anchor="middle" class="name">kafka :29092</text>
+  <text x="812" y="956" text-anchor="middle" class="detail">uygulama bağlantısı</text>
+
+  <rect x="995" y="855" width="290" height="130" class="box stateful"/>
+  <text x="1140" y="888" text-anchor="middle" class="kind">StatefulSet · 1 pod</text>
+  <text x="1140" y="919" text-anchor="middle" class="name">kafka-0</text>
+  <text x="1140" y="944" text-anchor="middle" class="detail">KRaft broker + controller</text>
+  <text x="1140" y="967" text-anchor="middle" class="detail">kafka-headless ile sabit DNS</text>
+
+  <rect x="1030" y="1010" width="220" height="65" class="box pvc"/>
+  <text x="1140" y="1038" text-anchor="middle" class="kind">PVC</text>
+  <text x="1140" y="1061" text-anchor="middle" class="detail">kafka-data · 10 GiB</text>
+
+  <rect x="1390" y="715" width="210" height="100" class="box service"/>
+  <text x="1495" y="747" text-anchor="middle" class="kind">Service · ClusterIP</text>
+  <text x="1495" y="778" text-anchor="middle" class="name">mongodb :27017</text>
+  <text x="1495" y="801" text-anchor="middle" class="detail">uygulama bağlantısı</text>
+
+  <rect x="1390" y="870" width="270" height="115" class="box stateful"/>
+  <text x="1525" y="903" text-anchor="middle" class="kind">StatefulSet · 1 pod</text>
+  <text x="1525" y="934" text-anchor="middle" class="name">mongodb-0</text>
+  <text x="1525" y="958" text-anchor="middle" class="detail">flightdb · mongodb-headless</text>
+  <text x="1525" y="980" text-anchor="middle" class="detail">ile sabit DNS</text>
+
+  <rect x="1415" y="1010" width="220" height="65" class="box pvc"/>
+  <text x="1525" y="1038" text-anchor="middle" class="kind">PVC</text>
+  <text x="1525" y="1061" text-anchor="middle" class="detail">mongodb-data · 10 GiB</text>
+
+  <path d="M260 303 H405" class="line"/><text x="284" y="286" class="label">HTTP</text>
+  <path d="M635 312 H720" class="line"/>
+  <path d="M930 312 H1015" class="line"/>
+  <path d="M1285 312 H1390" class="line"/>
+  <path d="M1495 365 V445" class="line"/>
+  <path d="M1390 500 H1285 V380" class="line"/><text x="1268" y="445" text-anchor="end" class="label">/api · /health · /ws</text>
+  <path d="M260 728 H405" class="data"/><text x="282" y="710" class="label">REST</text>
+  <path d="M655 722 H700 V920" class="data"/><text x="670" y="700" class="label">üretir</text>
+  <path d="M840 750 V870" class="data"/><text x="855" y="814" class="label">topic hazırlar</text>
+  <path d="M925 920 H995" class="line"/>
+  <path d="M1015 703 H925 V920" class="data"/><text x="946" y="688" class="label">tüketir</text>
+  <path d="M1390 545 H1320 V920 H925" class="live"/><text x="1325" y="610" class="label">tüketir</text>
+  <path d="M1285 703 H1390 V765" class="data"/><text x="1305" y="690" class="label">yazar</text>
+  <path d="M1525 590 V715" class="line"/>
+  <path d="M1495 815 V870" class="line"/>
+  <path d="M1525 985 V1010" class="dashed"/>
+  <path d="M1140 985 V1010" class="dashed"/>
+  <path d="M1285 500 H1360 V350 H1285" class="live"/><text x="1322" y="425" class="label">WebSocket</text>
+
+  <rect x="70" y="1120" width="22" height="15" class="ingress"/><text x="102" y="1134" class="detail">dış giriş</text>
+  <rect x="245" y="1120" width="22" height="15" class="service"/><text x="277" y="1134" class="detail">Service / ağ adı</text>
+  <rect x="450" y="1120" width="22" height="15" class="deployment"/><text x="482" y="1134" class="detail">stateless uygulama pod'u</text>
+  <rect x="755" y="1120" width="22" height="15" class="stateful"/><text x="787" y="1134" class="detail">kalıcı servis pod'u</text>
+  <rect x="1050" y="1120" width="22" height="15" class="pvc"/><text x="1082" y="1134" class="detail">kalıcı disk</text>
+  <path d="M1280 1128 H1345" class="data"/><text x="1360" y="1134" class="detail">kalıcı veri akışı</text>
+  <path d="M1575 1128 H1640" class="live"/><text x="1650" y="1134" class="detail">canlı akış</text>
+</svg>

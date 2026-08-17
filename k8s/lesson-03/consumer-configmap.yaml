@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consumer-config
+data:
+  # Consumer dışarıdan Kafka okur, MongoDB'ye yazar.
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  KAFKA_TOPIC: aircraft.positions.raw.v1
+  KAFKA_DLQ_TOPIC: aircraft.positions.dlq.v1
+  KAFKA_CONSUMER_GROUP: flight-mongodb-writer-v1
+  MONGODB_URI: mongodb://mongodb:27017
+  MONGODB_DATABASE: flightdb
+  RAW_POSITIONS_RETENTION_HOURS: "48"
+  LIVE_POSITIONS_RETENTION_HOURS: "168"
+  CONSUMER_MAX_ATTEMPTS: "3"
+  CONSUMER_RETRY_BACKOFF_SECONDS: "1"
