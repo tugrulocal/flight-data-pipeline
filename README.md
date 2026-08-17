@@ -106,4 +106,4 @@ Kısa rehber:
 - Ders 04: backend, frontend ve Ingress.
 - Ders 05: bütün sistemin birlikte çalışması.
 
-Proje localhost eğitimi içindir. LAN erişimi, kullanıcı hesabı, TLS ve internetten yayın v1.0 kapsamı dışındadır. Çalışma sırasında OpenSky ve harita tile'ları için internet gerekir.
+Proje localhost eğitimi içindir. LAN erişimi, kullanıcı hesabı, TLS ve internetten yayın v1.0 kapsamı dışındadır. Çalışma sırasında OpenSky ve harita tile'ları için internet gerekir. ArgoCD ve Kubernetes cluster, yalnızca ders 05'te kullanılır.
