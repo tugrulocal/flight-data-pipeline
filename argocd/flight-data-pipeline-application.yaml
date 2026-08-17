@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flight-data-pipeline
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: flight-data-pipeline
+spec:
+  # Başlangıçta varsayılan proje yeterli. Production'da ayrı AppProject ile
+  # kaynak ve hedef namespace izinlerini daha dar tutacağız.
+  project: default
+
+  source:
+    repoURL: https://github.com/tugrulocal/flight-data-pipeline.git
+    targetRevision: main
+    path: k8s/lesson-05
+
+  # Argo CD aynı cluster içinde çalışacağı için Kubernetes API'ye bu sabit
+  # servis adresiyle ulaşır; kullanıcı bilgisayarındaki kubeconfig'e bağlı değildir.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: flight-data-pipeline
+
+  # Otomatik sync/prune bilerek kapalıdır. İlk öğretici kurulumda önce Argo UI
+  # veya CLI üzerinden farkı inceleyip Sync'i kullanıcı başlatır.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
