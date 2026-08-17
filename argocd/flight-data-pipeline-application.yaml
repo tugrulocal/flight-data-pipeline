@@ -24,5 +24,9 @@ spec:
   # Otomatik sync/prune bilerek kapalıdır. İlk öğretici kurulumda önce Argo UI
   # veya CLI üzerinden farkı inceleyip Sync'i kullanıcı başlatır.
   syncPolicy:
-    syncOptions:
-      - CreateNamespace=false
+  automated:
+    enabled: true
+    prune: false
+    selfHeal: false
+  syncOptions:
+    - CreateNamespace=false
