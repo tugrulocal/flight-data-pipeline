@@ -1,6 +1,6 @@
 # Flight Data Pipeline
 
-OpenSky uçuş konumlarını Kafka üzerinden MongoDB'ye taşıyan, FastAPI REST/WebSocket ile React haritada sunan yerel veri mühendisliği projesi.
+OpenSky uçuş konumlarını Kafka üzerinden MongoDB'ye taşıyan, FastAPI REST/WebSocket ile React haritada sunan yerel veri mühendisliği projesi
 
 ## Veri akışı
 
