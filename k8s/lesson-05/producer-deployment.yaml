@@ -32,3 +32,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: producer-config
+            # OAuth bilgileri Git'te değil, cluster içindeki Secret'ta tutulur.
+            - secretRef:
+                name: opensky-credentials
