@@ -10,7 +10,7 @@ data:
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   KAFKA_TOPIC: aircraft.positions.raw.v1
   KAFKA_REALTIME_CONSUMER_GROUP: flight-realtime-gateway-v1
-  LIVE_POSITION_WINDOW_MINUTES: "20"
+  LIVE_POSITION_WINDOW_MINUTES: "2"
   WEBSOCKET_BATCH_INTERVAL_MS: "250"
   WEBSOCKET_BATCH_MAX_SIZE: "500"
   CORS_ORIGINS: http://app.flight.test,http://flight-data-pipeline.local,http://localhost:5175,http://127.0.0.1:5175
