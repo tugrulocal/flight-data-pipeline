@@ -74,3 +74,6 @@ spec:
       selfHeal: false
     syncOptions:
       - CreateNamespace=true
+      # Prometheus Operator CRD'leri client-side apply annotation sınırını
+      # aşar. Server-side apply, alan sahipliğini Kubernetes'te tutar.
+      - ServerSideApply=true

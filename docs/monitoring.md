@@ -11,6 +11,9 @@ uygulama /metrics -> Service -> ServiceMonitor -> Prometheus -> Grafana
 `argocd/monitoring-application.yaml`, sabit sürümlü
 `kube-prometheus-stack` chart'ını Argo CD ile kurar. Chart; Prometheus
 Operator, Prometheus, Grafana, kube-state-metrics ve node exporter içerir.
+Prometheus Operator CRD'leri büyük olduğu için Application, Argo CD'nin
+server-side apply seçeneğini kullanır; bu sayede Kubernetes'in client-side
+annotation boyut sınırına takılmaz.
 
 ## İlk kurulum öncesi secret
 
