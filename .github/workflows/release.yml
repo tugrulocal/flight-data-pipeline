@@ -116,6 +116,17 @@ jobs:
           done
           echo "$PACKAGE package'ı 15 dakika içinde public erişime açılmadı." >&2
           exit 1
+      - name: Multi-architecture image digest'ini kaydet
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p image-digests
+          printf '%s\n' "$DIGEST" > "image-digests/${{ matrix.service }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-digest-${{ matrix.service }}
+          path: image-digests/${{ matrix.service }}.txt
+          if-no-files-found: error
 
   offline:
     needs: publish
@@ -163,3 +174,45 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(env.RELEASE_VERSION, '-rc.') }}
           files: release-out/*
+
+  gitops-image-update:
+    # Image'lar imzalandıktan ve offline paketleri üretildikten sonra deployment
+    # manifestini doğrudan değiştirmek yerine incelemeye açık bir PR oluşturur.
+    needs: offline
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-digest-*
+          merge-multiple: true
+          path: image-digests
+      - name: Kubernetes image'larını immutable digest'e güncelle
+        run: |
+          python scripts/update-kubernetes-image-digests.py \
+            --manifest-directory k8s/lesson-05 \
+            --digest-directory image-digests \
+            --version "${{ env.RELEASE_VERSION }}"
+          kubectl kustomize k8s/lesson-05 >/dev/null
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/deploy-${{ env.RELEASE_VERSION }}
+          delete-branch: true
+          commit-message: >-
+            Deploy ${{ env.RELEASE_VERSION }} image digests with Argo CD
+          title: >-
+            Deploy ${{ env.RELEASE_VERSION }} image digests with Argo CD
+          body: |
+            Bu PR, release workflow'unun imzaladığı multi-architecture image
+            digest'lerini GitOps manifestlerine yazar.
+
+            Merge sonrası Argo CD, `k8s/lesson-05` değişikliğini otomatik sync eder.
+          add-paths: |
+            k8s/lesson-05/*-deployment.yaml
+            k8s/lesson-05/backend-configmap.yaml
+            k8s/lesson-05/kustomization.yaml

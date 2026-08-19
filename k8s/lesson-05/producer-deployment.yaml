@@ -12,6 +12,19 @@ spec:
       labels:
         app: producer
     spec:
+      # İlk OpenSky cevabını broker hazır olmadan almamak için Kafka portunu
+      # bekliyoruz; böylece ilk turdaki teslim hatası ve gereksiz kota kullanımı önlenir.
+      initContainers:
+        - name: wait-for-kafka
+          image: apache/kafka-native:4.3.1@sha256:2885898ba17065023f1bd605f3a81efcfa986014f062b73b91ef5462485f9060
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until nc -z -w 2 kafka 29092; do
+                echo 'Kafka bekleniyor...'
+                sleep 2
+              done
       containers:
         - name: producer
           image: ghcr.io/tugrulocal/flight-data-pipeline-producer:v1.0.0-rc.3

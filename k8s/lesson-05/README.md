@@ -59,6 +59,29 @@ Bu ayrım pratikte çok önemlidir.
 kubectl apply -k k8s/lesson-05
 ```
 
+## Local tarayıcı adresleri
+
+Docker Desktop'ın Ingress controller'ı Mac'te `127.0.0.1:80` üzerinden
+erişilebilir. Gerçek bir domain satın almadan önce aşağıdaki local isimleri
+kullanıyoruz:
+
+```text
+app.flight.test  -> frontend Service
+argo.flight.test -> argocd-server Service
+```
+
+Bu iki adı yalnız kendi Mac'imizde çözmek için `/etc/hosts` dosyasına tek satır
+ekleriz:
+
+```text
+127.0.0.1 app.flight.test argo.flight.test
+```
+
+`app.flight.test` kullanıcı uygulamasına, `argo.flight.test` ise yönetim
+paneline gider. MongoDB ve Kafka için Ingress veya dış host oluşturulmaz;
+pod'lar onlara yalnız Kubernetes DNS'iyle (`mongodb:27017`, `kafka:29092`)
+bağlanır.
+
 ## Ne kontrol ederiz?
 
 ```bash

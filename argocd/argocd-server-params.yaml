@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  # TLS'i localde kullanmıyoruz; production'da HTTPS sertifikası Ingress'te
+  # sonlandırılacağı için Argo CD ile Ingress arasındaki HTTP yeterlidir.
+  server.insecure: "true"

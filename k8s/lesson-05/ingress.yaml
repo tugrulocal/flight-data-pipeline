@@ -5,7 +5,9 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: flight-data-pipeline.local
+    # Bu host, local ortamda /etc/hosts ile 127.0.0.1'e yönlendirilir.
+    # Production'da aynı kural gerçek domainimizle değiştirilecek.
+    - host: app.flight.test
       http:
         paths:
           - path: /
