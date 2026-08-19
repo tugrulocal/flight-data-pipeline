@@ -156,6 +156,10 @@ class OpenSkyClient:
     def close(self):
         self.session.close()
 
+    def invalidate_access_token(self):
+        self.access_token = None
+        self.token_expires_at = 0.0
+
     def get_access_token(self):
         if not self.settings.has_credentials:
             return None
@@ -191,30 +195,44 @@ class OpenSkyClient:
         return self.access_token
 
     def fetch_states(self):
-        token = self.get_access_token()
-        headers = {"Authorization": f"Bearer {token}"} if token else None
-        response = self.session.get(
-            OPENSKY_URL,
-            params=get_opensky_params(self.settings.area_mode),
-            headers=headers,
-            timeout=20,
-        )
-        remaining = response.headers.get("X-Rate-Limit-Remaining")
-        logger.info(
-            "OpenSky API cevabı alındı.",
-            extra={
-                "event": "opensky_response",
-                "http_status": response.status_code,
-                "rate_limit_remaining": remaining,
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
+        # Bir makine uyku modundan döndüğünde veya uzak taraf token'ı erken
+        # geçersiz kıldığında, yereldeki son-kullanım saati henüz dolmamış
+        # görünebilir. 401'de token'ı sıfırlayıp sadece bir kez yenileyerek
+        # hem hızlı toparlanırız hem de sonsuz tekrar döngüsünden kaçınırız.
+        for attempt in range(2):
+            token = self.get_access_token()
+            headers = {"Authorization": f"Bearer {token}"} if token else None
+            response = self.session.get(
+                OPENSKY_URL,
+                params=get_opensky_params(self.settings.area_mode),
+                headers=headers,
+                timeout=20,
+            )
+            remaining = response.headers.get("X-Rate-Limit-Remaining")
+            logger.info(
+                "OpenSky API cevabı alındı.",
+                extra={
+                    "event": "opensky_response",
+                    "http_status": response.status_code,
+                    "rate_limit_remaining": remaining,
+                },
+            )
 
-        if not isinstance(payload, dict):
-            raise ValueError("OpenSky cevabı JSON nesnesi olmalı.")
+            if response.status_code == 401 and token and attempt == 0:
+                self.invalidate_access_token()
+                logger.warning(
+                    "OpenSky OAuth token geçersiz; token yenilenerek istek tekrar edilecek.",
+                    extra={"event": "oauth_unauthorized_retry"},
+                )
+                continue
 
-        return payload.get("time"), payload.get("states") or []
+            response.raise_for_status()
+            payload = response.json()
+
+            if not isinstance(payload, dict):
+                raise ValueError("OpenSky cevabı JSON nesnesi olmalı.")
+
+            return payload.get("time"), payload.get("states") or []
 
 
 def normalize_state(state, api_time, *, event_id=None, ingested_at=None):

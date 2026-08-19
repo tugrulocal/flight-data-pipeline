@@ -1,9 +1,11 @@
 import json
 
 import pytest
+import requests
 
 from producer.opensky_producer import (
     DeliveryTracker,
+    OpenSkyClient,
     get_effective_poll_interval,
     load_settings,
     normalize_state,
@@ -94,6 +96,68 @@ def test_authenticated_global_interval_uses_configured_value():
     })
 
     assert get_effective_poll_interval(settings) == 120
+
+
+class FakeResponse:
+    def __init__(self, status_code, payload=None, headers=None):
+        self.status_code = status_code
+        self.payload = payload or {}
+        self.headers = headers or {}
+
+    def json(self):
+        return self.payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            error = requests.HTTPError(f"HTTP {self.status_code}")
+            error.response = self
+            raise error
+
+
+def test_opensky_client_retries_once_with_a_fresh_token_after_unauthorized():
+    class Session:
+        def __init__(self):
+            self.post_calls = 0
+            self.get_headers = []
+
+        def post(self, *_args, **_kwargs):
+            self.post_calls += 1
+            return FakeResponse(
+                200,
+                {
+                    "access_token": f"token-{self.post_calls}",
+                    "expires_in": 1800,
+                },
+            )
+
+        def get(self, *_args, headers, **_kwargs):
+            self.get_headers.append(headers)
+            if len(self.get_headers) == 1:
+                return FakeResponse(401)
+            return FakeResponse(200, {"time": 1_700_000_010, "states": []})
+
+        def close(self):
+            pass
+
+    session = Session()
+    client = OpenSkyClient(
+        load_settings(
+            {
+                "OPENSKY_CLIENT_ID": "client-id",
+                "OPENSKY_CLIENT_SECRET": "client-secret",
+            }
+        ),
+        session=session,
+    )
+
+    api_time, states = client.fetch_states()
+
+    assert (api_time, states) == (1_700_000_010, [])
+    assert session.post_calls == 2
+    assert session.get_headers == [
+        {"Authorization": "Bearer token-1"},
+        {"Authorization": "Bearer token-2"},
+    ]
 
 
 class FakeProducer:
