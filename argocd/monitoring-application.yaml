@@ -77,3 +77,7 @@ spec:
       # Prometheus Operator CRD'leri client-side apply annotation sınırını
       # aşar. Server-side apply, alan sahipliğini Kubernetes'te tutar.
       - ServerSideApply=true
+      # Argo'nun varsayılan client-side migration adımı da aynı büyük
+      # annotation'ı yazmaya çalışır. Bu CRD'ler yeni olduğu için geçişe gerek
+      # yok; doğrudan server-side apply kullanılır.
+      - ClientSideApplyMigration=false

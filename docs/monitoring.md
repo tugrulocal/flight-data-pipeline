@@ -13,7 +13,8 @@ uygulama /metrics -> Service -> ServiceMonitor -> Prometheus -> Grafana
 Operator, Prometheus, Grafana, kube-state-metrics ve node exporter içerir.
 Prometheus Operator CRD'leri büyük olduğu için Application, Argo CD'nin
 server-side apply seçeneğini kullanır; bu sayede Kubernetes'in client-side
-annotation boyut sınırına takılmaz.
+annotation boyut sınırına takılmaz. Aynı nedenle client-side apply migration
+bu Application için kapalıdır; CRD'ler doğrudan server-side yönetilir.
 
 ## İlk kurulum öncesi secret
 
