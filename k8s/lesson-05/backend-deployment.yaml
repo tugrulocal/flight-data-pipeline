@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
+  annotations:
+    # Reloader yalnız bu ConfigMap değiştiğinde backend'i rolling restart eder.
+    # Diğer ConfigMap veya Secret değişimleri bu deployment'ı etkilemez.
+    configmap.reloader.stakater.com/reload: backend-config
 spec:
   replicas: 1
   selector:

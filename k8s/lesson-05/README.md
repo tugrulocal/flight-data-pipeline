@@ -98,6 +98,26 @@ kubectl create secret generic opensky-credentials \
 Producer Deployment bu Secret'ı `envFrom.secretRef` ile alır. Yeni bir cluster'a
 uygulama kurulmadan önce aynı Secret yeniden oluşturulmalıdır.
 
+## ConfigMap değişince neden backend yeniden başlar?
+
+Backend ayarları environment variable olarak pod başlarken okunur. Kubernetes,
+bir ConfigMap değiştiğinde çalışan pod'un environment'ını değiştirmez. Bu yüzden
+Reloader controller'ı yalnız `backend-config` değişimini izler ve backend için
+rolling restart başlatır:
+
+```text
+Git'te backend-config değişir
+        -> Argo CD ConfigMap'i günceller
+        -> Reloader değişimi algılar
+        -> Kubernetes yeni backend pod'unu başlatır
+        -> yeni pod güncel ayarı okur
+```
+
+Reloader `k8s/platform/reloader` altında sabit upstream sürümüyle tanımlanır;
+uygulama Deployment'ına verilen `configmap.reloader.stakater.com/reload`
+anotasyonu yalnız `backend-config` için etkindir. Böylece her Secret veya
+ConfigMap değişikliği gereksiz restart oluşturmaz.
+
 ## Ne kontrol ederiz?
 
 ```bash

@@ -21,6 +21,16 @@ spec:
     server: https://kubernetes.default.svc
     namespace: flight-data-pipeline
 
+  # Reloader'ın otomatik restart için eklediği çalışma-zamanı anotasyonu Git'te
+  # bulunmaz; bu tek alanı GitOps farkı olarak değerlendirmiyoruz.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: backend
+      namespace: flight-data-pipeline
+      jsonPointers:
+        - /spec/template/metadata/annotations/reloader.stakater.com~1last-reloaded-from
+
   # Git değişiklikleri otomatik uygulanır; silme ve elle yapılan cluster
   # değişikliklerini geri alma ise ilk aşamada özellikle kapalı tutulur.
   syncPolicy:

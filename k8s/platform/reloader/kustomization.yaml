@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: reloader
+
+# Reloader manifesti upstream sürümüne sabitlenir; `main`/`master` takip edilmez.
+resources:
+  - namespace.yaml
+  - https://github.com/stakater/Reloader/deployments/kubernetes?ref=chart-v2.2.16
+
+# Annotation stratejisi, Reloader'ın restart bilgisini pod template anotasyonuna
+# yazar; Argo CD için varsayılan dummy environment variable yaklaşımından daha
+# temiz bir çalışma-zamanı farkı oluşturur.
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: reloader-reloader
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args
+        value:
+          - --reload-strategy=annotations
