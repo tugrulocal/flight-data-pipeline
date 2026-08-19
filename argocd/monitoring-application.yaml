@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Helm chart sürümünü sabitlemek, local eğitim ortamının beklenmedik bir
+    # upstream güncellemeyle değişmesini önler.
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 87.21.0
+    helm:
+      releaseName: monitoring
+      values: |
+        # Alert kurallarını ileride ekleyeceğiz. İlk aşamada metrik toplama ve
+        # dashboard okumayı öğrenmek için Alertmanager'ı çalıştırmıyoruz.
+        alertmanager:
+          enabled: false
+
+        grafana:
+          defaultDashboardsTimezone: Europe/Istanbul
+          admin:
+            # Değerin kendisi Git'e yazılmaz; Secret cluster'da elle oluşturulur.
+            existingSecret: grafana-admin-credentials
+            userKey: admin-user
+            passwordKey: admin-password
+          persistence:
+            enabled: true
+            storageClassName: standard
+            size: 1Gi
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - grafana.flight.test
+
+        prometheus:
+          prometheusSpec:
+            # Local eğitim için kısa saklama ve küçük, kalıcı bir disk yeterli.
+            retention: 2d
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: standard
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 2Gi
+
+        # Docker Desktop control-plane bileşenleri Service üzerinden güvenilir
+        # biçimde keşfedilmediği için ilk local kurulumda bunları izlemiyoruz.
+        kubeEtcd:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true

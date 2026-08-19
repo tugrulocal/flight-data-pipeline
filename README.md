@@ -85,6 +85,7 @@ MapLibre varsayılandır. WebGL yoksa, harita kurulamazsa veya context kaybolurs
 - [Backup ve restore](docs/backup-restore.md)
 - [Release ve offline dağıtım](docs/release.md)
 - [Release kabul matrisi](docs/release-acceptance.md)
+- [Local Prometheus ve Grafana izleme](docs/monitoring.md)
 - [Üçüncü taraf bildirimleri](THIRD_PARTY_NOTICES.md)
 - [Güvenlik politikası ve RC kapısı](SECURITY.md)
 
