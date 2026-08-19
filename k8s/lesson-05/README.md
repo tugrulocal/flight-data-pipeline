@@ -82,6 +82,22 @@ paneline gider. MongoDB ve Kafka için Ingress veya dış host oluşturulmaz;
 pod'lar onlara yalnız Kubernetes DNS'iyle (`mongodb:27017`, `kafka:29092`)
 bağlanır.
 
+## OpenSky OAuth bilgisi
+
+Producer'ın daha sık ve kimlik doğrulamalı OpenSky isteği yapabilmesi için
+OAuth bilgileri Git'e veya ConfigMap'e yazılmaz. Cluster'a bir kez Secret olarak
+eklenir; gerçek değer terminal çıktısına ve commit'e düşmemelidir:
+
+```bash
+kubectl create secret generic opensky-credentials \
+  --namespace flight-data-pipeline \
+  --from-env-file=<(grep -E '^OPENSKY_CLIENT_(ID|SECRET)=' .env) \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Producer Deployment bu Secret'ı `envFrom.secretRef` ile alır. Yeni bir cluster'a
+uygulama kurulmadan önce aynı Secret yeniden oluşturulmalıdır.
+
 ## Ne kontrol ederiz?
 
 ```bash
