@@ -162,7 +162,32 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "/^kafka-[0-9]+$/" },
+            "properties": [ { "id": "displayName", "value": "Kafka" } ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "/^mongodb-[0-9]+$/" },
+            "properties": [ { "id": "displayName", "value": "MongoDB" } ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "/^backend-.*$/" },
+            "properties": [ { "id": "displayName", "value": "Backend" } ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "/^frontend-.*$/" },
+            "properties": [ { "id": "displayName", "value": "Frontend" } ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "/^producer-.*$/" },
+            "properties": [ { "id": "displayName", "value": "Producer" } ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "/^consumer-.*$/" },
+            "properties": [ { "id": "displayName", "value": "Consumer" } ]
+          }
+        ]
       },
       "gridPos": { "h": 13, "w": 8, "x": 0, "y": 0 },
       "id": 7,
