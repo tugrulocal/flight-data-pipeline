@@ -83,3 +83,7 @@ Kubernetes katmanında uzun ömürlü pod'ların Ready durumu, pod CPU/bellek/a�
 trafiği ve Docker Desktop node'unun CPU/RAM kullanımı da aynı dashboard'dadır.
 `kafka-topic-init` bir Job olduğu için Completed olduğunda Ready=0 göstermesi
 beklenen davranıştır; bu nedenle pod sağlık panelinden hariç tutulur.
+Pod sağlığındaki `1`/`0` değerleri Grafana value mapping ile sırasıyla
+`Hazır`/`Hazır değil` olarak gösterilir. Ayrı restart paneli, son bir saat
+içinde aynı pod'da gerçekleşen container restartlarını gösterir; Deployment
+rollout'unun oluşturduğu yeni pod'larla karıştırılmamalıdır.

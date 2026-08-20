@@ -9,53 +9,6 @@
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Prometheus scrape, backend -> MongoDB ping ve backend Kafka realtime bağlantısını tek bakışta gösterir.",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "decimals": 0,
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "id": 1,
-      "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 75,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "13.1.1",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "editorMode": "code",
-          "expr": "label_replace(min by (namespace) (up{namespace=\"flight-data-pipeline\", service=\"backend\"}), \"component\", \"Backend scrape\", \"namespace\", \".*\") or label_replace(min by (namespace) (flight_backend_mongodb_up{namespace=\"flight-data-pipeline\"}), \"component\", \"MongoDB\", \"namespace\", \".*\") or label_replace(min by (namespace) (flight_backend_kafka_realtime_connected{namespace=\"flight-data-pipeline\"}), \"component\", \"Kafka realtime\", \"namespace\", \".*\")",
-          "instant": true,
-          "legendFormat": "{{component}}",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Bileşen sağlığı",
-      "type": "bargauge"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "MongoDB'ye son yazılan uçuş verisinin yaşı. 3 dakikadan sonrası dikkat, 5 dakikadan sonrası sorun kabul edilir.",
       "fieldConfig": {
         "defaults": {
@@ -73,7 +26,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 0 },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 8 },
       "id": 2,
       "options": {
         "colorMode": "background_solid",
@@ -100,44 +53,12 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Backend'e bağlı canlı harita/WebSocket istemcilerinin toplamı.",
-      "fieldConfig": {
-        "defaults": { "color": { "mode": "palette-classic" }, "decimals": 0 },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 0 },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
-        "textMode": "value"
-      },
-      "pluginVersion": "13.1.1",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "editorMode": "code",
-          "expr": "sum(flight_backend_websocket_clients{namespace=\"flight-data-pipeline\"})",
-          "instant": true,
-          "legendFormat": "",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Canlı istemci",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Backend HTTP endpoint'lerine gelen istek hızı; route ve HTTP durum koduna göre gruplanır.",
       "fieldConfig": {
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
       "id": 4,
       "options": {
         "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -164,7 +85,7 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
       "id": 5,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -191,7 +112,7 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 17 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 22 },
       "id": 6,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -219,6 +140,15 @@
           "color": { "mode": "thresholds" },
           "decimals": 0,
           "max": 1,
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "index": 0, "text": "Hazır değil" },
+                "1": { "color": "green", "index": 1, "text": "Hazır" }
+              },
+              "type": "value"
+            }
+          ],
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -230,18 +160,15 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 17 },
+      "gridPos": { "h": 13, "w": 8, "x": 0, "y": 0 },
       "id": 7,
       "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 75,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
+        "orientation": "auto",
         "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
-        "showUnfilled": true,
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "showUnfilled": true
       },
       "pluginVersion": "13.1.1",
       "targets": [
@@ -256,7 +183,7 @@
         }
       ],
       "title": "Pod hazır olma durumu",
-      "type": "bargauge"
+      "type": "gauge"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -265,11 +192,18 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "cores" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 26 },
+      "gridPos": { "h": 13, "w": 8, "x": 16, "y": 0 },
       "id": 8,
       "options": {
-        "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "displayMode": "gradient",
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "text"
       },
       "pluginVersion": "13.1.1",
       "targets": [
@@ -283,7 +217,7 @@
         }
       ],
       "title": "Pod CPU kullanımı",
-      "type": "timeseries"
+      "type": "bargauge"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -292,7 +226,7 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 26 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 22 },
       "id": 9,
       "options": {
         "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -319,7 +253,7 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "Bps" },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 35 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
       "id": 10,
       "options": {
         "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -351,14 +285,31 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Docker Desktop Kubernetes node'unun CPU ve RAM kullanım yüzdesi. Bu değer pod değil, pod'ları çalıştıran node içindir.",
       "fieldConfig": {
-        "defaults": { "color": { "mode": "palette-classic" }, "unit": "percent" },
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 80 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 44 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
       "id": 11,
       "options": {
-        "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "orientation": "auto",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "showUnfilled": true
       },
       "pluginVersion": "13.1.1",
       "targets": [
@@ -380,7 +331,54 @@
         }
       ],
       "title": "Node CPU / RAM kullanımı",
-      "type": "timeseries"
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Son bir saat içinde aynı pod içindeki container yeniden başlatmalarının sayısı. Deployment rollout'u yeni pod oluşturduğu için bu metrik doğrudan uygulama çökmesi veya liveness/OOM sorunlarını yakalamada kullanılır.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "text"
+      },
+      "pluginVersion": "13.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "editorMode": "code",
+          "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"flight-data-pipeline\", container!=\"topic-init\"}[1h]))",
+          "instant": true,
+          "legendFormat": "{{pod}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Son 1 saatte container restart",
+      "type": "bargauge"
     }
   ],
   "refresh": "30s",
@@ -392,5 +390,5 @@
   "timezone": "Europe/Istanbul",
   "title": "Flight Pipeline Overview",
   "uid": "flight-pipeline-overview",
-  "version": 1
+  "version": 3
 }
