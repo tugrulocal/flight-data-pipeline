@@ -32,7 +32,7 @@ spec:
               done
       containers:
         - name: backend
-          image: ghcr.io/tugrulocal/flight-data-pipeline-backend:v1.0.0-rc.3
+          image: ghcr.io/tugrulocal/flight-data-pipeline-backend@sha256:5d5319bd514e3bf3fffff64050c4ff11e998980f812bb403b8b066f34ed190c4
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

@@ -27,7 +27,7 @@ spec:
               done
       containers:
         - name: producer
-          image: ghcr.io/tugrulocal/flight-data-pipeline-producer:v1.0.0-rc.3
+          image: ghcr.io/tugrulocal/flight-data-pipeline-producer@sha256:db8fa2a472cb5eedbf7c1f4e67f984796e652c56cd1d3d82d0aae5f175b18b00
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

@@ -27,7 +27,7 @@ spec:
               done
       containers:
         - name: consumer
-          image: ghcr.io/tugrulocal/flight-data-pipeline-consumer:v1.0.0-rc.3
+          image: ghcr.io/tugrulocal/flight-data-pipeline-consumer@sha256:c1c9ff73f4112cc9aa588aaea635469af68ebbdc3168e41624de452360cb1514
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
