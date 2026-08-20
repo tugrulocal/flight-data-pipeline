@@ -25,6 +25,18 @@ resources:
   - frontend-deployment.yaml
   - ingress.yaml
 
+# Grafana sidecar, bu ConfigMap'i grafana_dashboard=1 etiketiyle keşfeder.
+# Hash'i kapatmak dashboard adını sabit tutar; Argo güncelleme yapabilir.
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+
+configMapGenerator:
+  - name: flight-pipeline-overview-dashboard
+    files:
+      - flight-pipeline-overview.json=dashboards/flight-pipeline-overview.json
+
 labels:
   - pairs:
       app.kubernetes.io/part-of: flight-data-pipeline

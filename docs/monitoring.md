@@ -68,3 +68,14 @@ istemcileri ile uçuş verisi yaşını verir. `ServiceMonitor`, backend Service
 etiketi ve isimli `http` portu üzerinden her 30 saniyede keşfeder.
 `icao24` ve `event_id` gibi çok sayıda farklı değer metric label'ı yapılmaz;
 aksi halde Prometheus gereksiz sayıda zaman serisi üretir.
+
+## GitOps dashboard
+
+`k8s/lesson-05/dashboards/flight-pipeline-overview.json`, uygulamaya ait
+Grafana dashboard'unun kaynak halidir. Kustomize bunu
+`grafana_dashboard=1` etiketli, sabit isimli bir ConfigMap'e dönüştürür.
+Grafana sidecar'ı ConfigMap'i cluster genelinde izler ve dashboard'u otomatik
+yükler; böylece dashboard değişikliği de kod ve Argo CD üzerinden takip edilir.
+
+İlk dashboard; bileşen sağlığı, uçuş verisi yaşı, bağlı WebSocket istemcileri,
+HTTP istek hızı ve p95 yanıt süresi ile backend'in Kafka işleme hızını gösterir.
