@@ -27,7 +27,7 @@ spec:
               done
       containers:
         - name: frontend
-          image: ghcr.io/tugrulocal/flight-data-pipeline-frontend:v1.0.0-rc.3
+          image: ghcr.io/tugrulocal/flight-data-pipeline-frontend@sha256:7a2481d9a49e15e30e7b9e9212d3a9f76687ea956385c1120cd94b038081e731
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: nginx-config
