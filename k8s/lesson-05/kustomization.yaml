@@ -18,6 +18,7 @@ resources:
   - consumer-deployment.yaml
   - backend-configmap.yaml
   - backend-service.yaml
+  - backend-servicemonitor.yaml
   - backend-deployment.yaml
   - frontend-nginx-configmap.yaml
   - frontend-service.yaml

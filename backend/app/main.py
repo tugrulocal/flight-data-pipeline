@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
@@ -13,12 +14,18 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pymongo.errors import PyMongoError
 
 from .config import load_settings
 from .database import MongoRepository
 from .kafka_gateway import KafkaRealtimeGateway
+from .metrics import (
+    observe_http_request,
+    render_metrics,
+    route_label,
+    update_runtime_metrics,
+)
 from .websocket_manager import WebSocketManager
 from flight_common.logging import configure_json_logging
 
@@ -107,6 +114,26 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def collect_http_metrics(request, call_next):
+    """İstekleri route şablonuyla ölçer; uçak kimliği gibi sınırsız label üretmez."""
+
+    started_at = time.perf_counter()
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        observe_http_request(
+            request.method,
+            route_label(request.scope),
+            status_code,
+            time.perf_counter() - started_at,
+        )
+
+
 async def run_mongo(operation, *args):
     """Senkron PyMongo işlemini olay döngüsünü durdurmadan çalıştırır."""
 
@@ -132,6 +159,7 @@ async def root():
     return {
         "service": "flight-data-pipeline-backend",
         "health": "/health",
+        "metrics": "/metrics",
         "docs": "/docs",
         "websocket": "/ws/aircraft",
     }
@@ -245,6 +273,52 @@ async def health(request: Request):
         status_code=200 if healthy else 503,
         content=payload,
     )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics(request: Request):
+    """Prometheus'un cluster içinden çağırdığı metric endpoint'i."""
+
+    repository = repository_from(request)
+    gateway = request.app.state.kafka_gateway
+    mongo_up = True
+    latest_ingested_at = None
+
+    try:
+        await asyncio.to_thread(repository.ping)
+        latest_ingested_at = await asyncio.to_thread(
+            repository.get_latest_ingested_at
+        )
+    except PyMongoError as error:
+        mongo_up = False
+        logger.warning(
+            "Metrics MongoDB hatası.",
+            extra={"event": "metrics_mongodb_error", "error": str(error)},
+        )
+
+    freshness_seconds = None
+    if isinstance(latest_ingested_at, datetime):
+        freshness_seconds = max(
+            0,
+            int(
+                (
+                    datetime.now(timezone.utc)
+                    - latest_ingested_at.astimezone(timezone.utc)
+                ).total_seconds()
+            ),
+        )
+
+    update_runtime_metrics(
+        mongo_up=mongo_up,
+        kafka_connected=gateway.status.connected,
+        gateway_status=gateway.status,
+        websocket_clients=(
+            request.app.state.websocket_manager.connection_count
+        ),
+        data_freshness_seconds=freshness_seconds,
+    )
+    payload, content_type = render_metrics()
+    return Response(content=payload, media_type=content_type)
 
 
 @app.get("/api/aircraft")

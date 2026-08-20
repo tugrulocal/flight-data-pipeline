@@ -62,7 +62,9 @@ kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 909
 
 ## Sıradaki uygulama metriği
 
-İlk stack kurulunca backend'e `/metrics` endpoint'i eklenir. `ServiceMonitor`,
-backend Service'ini etiketi ve isimli `http` portu üzerinden keşfeder.
+Backend `/metrics` endpoint'i; HTTP istek sayısı/süresi, MongoDB ve Kafka
+bağlantı durumu, işlenen mesaj ve WebSocket batch sayıları, aktif WebSocket
+istemcileri ile uçuş verisi yaşını verir. `ServiceMonitor`, backend Service'ini
+etiketi ve isimli `http` portu üzerinden her 30 saniyede keşfeder.
 `icao24` ve `event_id` gibi çok sayıda farklı değer metric label'ı yapılmaz;
 aksi halde Prometheus gereksiz sayıda zaman serisi üretir.

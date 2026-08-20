@@ -10,7 +10,7 @@ from backend.app.config import load_settings
 from backend.app.contracts import public_aircraft_from_event
 from backend.app.database import MongoRepository
 from backend.app.kafka_gateway import KafkaRealtimeGateway, PendingRealtimeMessage
-from backend.app.main import aircraft_websocket, health
+from backend.app.main import aircraft_websocket, health, metrics
 from backend.app.websocket_manager import WebSocketManager
 
 
@@ -157,6 +157,42 @@ def test_stale_data_is_informational_and_does_not_fail_health():
     assert response.status_code == 200
     assert payload["status"] == "ok"
     assert payload["data_freshness"]["status"] == "stale"
+
+
+def test_metrics_expose_aggregated_runtime_state():
+    class Repository:
+        def ping(self):
+            return None
+
+        def get_latest_ingested_at(self):
+            return datetime(2000, 1, 1, tzinfo=timezone.utc)
+
+    gateway = SimpleNamespace(
+        status=SimpleNamespace(
+            connected=True,
+            processed_messages=10,
+            published_batches=2,
+            skipped_messages=1,
+        )
+    )
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                repository=Repository(),
+                kafka_gateway=gateway,
+                websocket_manager=SimpleNamespace(connection_count=3),
+            )
+        )
+    )
+
+    response = asyncio.run(metrics(request))
+
+    assert response.status_code == 200
+    assert b"flight_backend_mongodb_up 1.0" in response.body
+    assert b"flight_backend_kafka_realtime_connected 1.0" in response.body
+    assert b"flight_backend_kafka_processed_messages 10.0" in response.body
+    assert b"flight_backend_websocket_clients 3.0" in response.body
+    assert b"flight_backend_data_freshness_available 1.0" in response.body
 
 
 def test_realtime_batch_commits_highest_offset_once_per_partition():
