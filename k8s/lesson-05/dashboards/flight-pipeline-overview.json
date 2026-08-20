@@ -49,6 +49,7 @@
         }
       ],
       "title": "Uçuş verisi yaşı",
+      "transparent": true,
       "type": "stat"
     },
     {
@@ -76,6 +77,7 @@
         }
       ],
       "title": "HTTP istek hızı (5 dk ortalama)",
+      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -103,6 +105,7 @@
         }
       ],
       "title": "HTTP p95 yanıt süresi",
+      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -130,6 +133,7 @@
         }
       ],
       "title": "Kafka işleme hızı",
+      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -183,6 +187,7 @@
         }
       ],
       "title": "Pod hazır olma durumu",
+      "transparent": true,
       "type": "gauge"
     },
     {
@@ -217,6 +222,7 @@
         }
       ],
       "title": "Pod CPU kullanımı",
+      "transparent": true,
       "type": "bargauge"
     },
     {
@@ -244,6 +250,7 @@
         }
       ],
       "title": "Pod bellek kullanımı",
+      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -253,7 +260,7 @@
         "defaults": { "color": { "mode": "palette-classic" }, "unit": "Bps" },
         "overrides": []
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 31 },
       "id": 10,
       "options": {
         "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -279,6 +286,7 @@
         }
       ],
       "title": "Pod ağ trafiği (RX / TX)",
+      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -331,6 +339,7 @@
         }
       ],
       "title": "Node CPU / RAM kullanımı",
+      "transparent": true,
       "type": "gauge"
     },
     {
@@ -352,7 +361,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 31 },
       "id": 12,
       "options": {
         "displayMode": "gradient",
@@ -378,6 +387,7 @@
         }
       ],
       "title": "Son 1 saatte container restart",
+      "transparent": true,
       "type": "bargauge"
     }
   ],
@@ -390,5 +400,5 @@
   "timezone": "Europe/Istanbul",
   "title": "Flight Pipeline Overview",
   "uid": "flight-pipeline-overview",
-  "version": 3
+  "version": 4
 }
