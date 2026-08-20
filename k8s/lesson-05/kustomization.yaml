@@ -28,6 +28,11 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/part-of: flight-data-pipeline
-      app.kubernetes.io/version: v1.0.0-rc.4
     includeSelectors: false
     includeTemplates: true
+  # Sürüm her release'te değişir. StatefulSet PVC ve tamamlanmış Job
+  # şablonları immutable olduğundan bu etiketi iç şablonlara yaymıyoruz.
+  - pairs:
+      app.kubernetes.io/version: v1.0.0-rc.4
+    includeSelectors: false
+    includeTemplates: false

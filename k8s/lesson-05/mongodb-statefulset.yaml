@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: mongodb
+        # Bu şablon ve PVC şablonu immutable'dır; release sürümüyle değişmez.
+        app.kubernetes.io/version: v1.0.0-rc.3
     spec:
       terminationGracePeriodSeconds: 30
       containers:
@@ -53,6 +55,9 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: mongodb-data
+        labels:
+          # Mevcut PVC şablonuyla aynı tutulur; release sırasında güncellenmez.
+          app.kubernetes.io/version: v1.0.0-rc.3
       spec:
         accessModes:
           - ReadWriteOnce

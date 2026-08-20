@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: kafka
+        # Bu şablon ve PVC şablonu immutable'dır; release sürümüyle değişmez.
+        app.kubernetes.io/version: v1.0.0-rc.3
     spec:
       terminationGracePeriodSeconds: 30
       initContainers:
@@ -94,6 +96,9 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: kafka-data
+        labels:
+          # Mevcut PVC şablonuyla aynı tutulur; release sırasında güncellenmez.
+          app.kubernetes.io/version: v1.0.0-rc.3
       spec:
         accessModes:
           - ReadWriteOnce

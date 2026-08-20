@@ -5,6 +5,10 @@ metadata:
 spec:
   backoffLimit: 3
   template:
+    metadata:
+      labels:
+        # Tamamlanmış Job pod şablonu immutable'dır; release sürümüyle değişmez.
+        app.kubernetes.io/version: v1.0.0-rc.3
     spec:
       restartPolicy: OnFailure
       containers:
