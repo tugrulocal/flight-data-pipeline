@@ -79,3 +79,7 @@ yükler; böylece dashboard değişikliği de kod ve Argo CD üzerinden takip ed
 
 İlk dashboard; bileşen sağlığı, uçuş verisi yaşı, bağlı WebSocket istemcileri,
 HTTP istek hızı ve p95 yanıt süresi ile backend'in Kafka işleme hızını gösterir.
+Kubernetes katmanında uzun ömürlü pod'ların Ready durumu, pod CPU/bellek/ağ
+trafiği ve Docker Desktop node'unun CPU/RAM kullanımı da aynı dashboard'dadır.
+`kafka-topic-init` bir Job olduğu için Completed olduğunda Ready=0 göstermesi
+beklenen davranıştır; bu nedenle pod sağlık panelinden hariç tutulur.
