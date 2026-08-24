@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: backend-config
 data:
-  APP_VERSION: v1.0.0-rc.4
+  APP_VERSION: v1.0.0-rc.5
   APP_PORT: "8000"
   MONGODB_URI: mongodb://mongodb:27017
   MONGODB_DATABASE: flightdb

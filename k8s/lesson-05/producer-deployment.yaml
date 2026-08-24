@@ -27,7 +27,7 @@ spec:
               done
       containers:
         - name: producer
-          image: ghcr.io/tugrulocal/flight-data-pipeline-producer@sha256:db8fa2a472cb5eedbf7c1f4e67f984796e652c56cd1d3d82d0aae5f175b18b00
+          image: ghcr.io/tugrulocal/flight-data-pipeline-producer@sha256:5fa81b27495a8dc812b3c04c09de89acb276c38c4bfc4fb8c09a8526a2fc0e19
           imagePullPolicy: IfNotPresent
           ports:
             - name: metrics
