@@ -47,6 +47,6 @@ labels:
   # Sürüm her release'te değişir. StatefulSet PVC ve tamamlanmış Job
   # şablonları immutable olduğundan bu etiketi iç şablonlara yaymıyoruz.
   - pairs:
-      app.kubernetes.io/version: v1.0.0-rc.4
+      app.kubernetes.io/version: v1.0.0-rc.5
     includeSelectors: false
     includeTemplates: false
