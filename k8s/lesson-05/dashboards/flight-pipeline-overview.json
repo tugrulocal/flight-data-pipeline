@@ -414,6 +414,152 @@
       "title": "Son 1 saatte container restart",
       "transparent": true,
       "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Producer'ın OpenSky'dan son başarılı veri aldığı andan itibaren geçen süre. Producer iki dakikada bir sorgu yaptığı için üç dakikadan sonrası dikkat gerektirir.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 180 },
+              { "color": "red", "value": 300 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 41 },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "pluginVersion": "13.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "editorMode": "code",
+          "expr": "time() - max(flight_producer_last_opensky_success_timestamp_seconds{namespace=\"flight-data-pipeline\"})",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "OpenSky son başarı yaşı",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Son bir saatte OpenSky rate-limit nedeniyle beklenen toplam süre. Sıfır, producer'ın kota engeline takılmadığını gösterir.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 60 },
+              { "color": "red", "value": 900 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 41 },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "pluginVersion": "13.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "editorMode": "code",
+          "expr": "sum(increase(flight_producer_rate_limit_wait_seconds_total{namespace=\"flight-data-pipeline\"}[1h]))",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Kota beklemesi (1 saat)",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "OpenSky sorgularının beş dakikalık ortalama sonucu. success dışındaki bir seri, veri kaynağı veya kota sorununun başlangıcını gösterir.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 41 },
+      "id": 15,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "13.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "editorMode": "code",
+          "expr": "sum by (outcome) (rate(flight_producer_opensky_requests_total{namespace=\"flight-data-pipeline\"}[5m]))",
+          "legendFormat": "{{outcome}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "OpenSky istek sonucu (5 dk)",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Producer'ın Kafka'ya başarıyla teslim ettiği uçuş kayıtlarının beş dakikalık ortalama hızı.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 48 },
+      "id": 16,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "13.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "editorMode": "code",
+          "expr": "sum(rate(flight_producer_kafka_records_delivered_total{namespace=\"flight-data-pipeline\"}[5m]))",
+          "legendFormat": "kayıt/sn",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka'ya teslim hızı (5 dk)",
+      "transparent": true,
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -425,5 +571,5 @@
   "timezone": "Europe/Istanbul",
   "title": "Flight Pipeline Overview",
   "uid": "flight-pipeline-overview",
-  "version": 5
+  "version": 6
 }
