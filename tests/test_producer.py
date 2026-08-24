@@ -12,6 +12,11 @@ from producer.opensky_producer import (
     run,
     send_states_to_kafka,
 )
+from flight_common.producer_metrics import (
+    KAFKA_RECORDS_DELIVERED,
+    LAST_OPENSKY_SUCCESS_TIMESTAMP_SECONDS,
+    OPENSKY_REQUESTS,
+)
 
 
 def sample_state():
@@ -207,6 +212,38 @@ def test_run_fetches_immediately_then_waits_effective_interval():
     )
 
     assert calls[:3] == ["fetch", ("wait", 900), "fetch"]
+
+
+def test_run_records_successful_opensky_and_kafka_metrics():
+    class Client:
+        def fetch_states(self):
+            return 1_700_000_010, [sample_state()]
+
+        def close(self):
+            pass
+
+    class StopEvent:
+        def is_set(self):
+            return False
+
+        def wait(self, _seconds):
+            return False
+
+    requests_before = OPENSKY_REQUESTS.labels(outcome="success")._value.get()
+    delivered_before = KAFKA_RECORDS_DELIVERED._value.get()
+
+    run(
+        load_settings({"MAX_POLLS": "1"}),
+        producer=FakeProducer(),
+        opensky_client=Client(),
+        stop_event=StopEvent(),
+    )
+
+    assert OPENSKY_REQUESTS.labels(outcome="success")._value.get() == (
+        requests_before + 1
+    )
+    assert KAFKA_RECORDS_DELIVERED._value.get() == delivered_before + 1
+    assert LAST_OPENSKY_SUCCESS_TIMESTAMP_SECONDS._value.get() > 0
 
 
 def test_delivery_failure_makes_poll_fail():

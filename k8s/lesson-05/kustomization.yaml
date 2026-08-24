@@ -13,6 +13,8 @@ resources:
   - kafka-statefulset.yaml
   - kafka-topic-init-job.yaml
   - producer-configmap.yaml
+  - producer-metrics-service.yaml
+  - producer-servicemonitor.yaml
   - producer-deployment.yaml
   - consumer-configmap.yaml
   - consumer-deployment.yaml

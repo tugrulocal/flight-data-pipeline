@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: producer
+  labels:
+    # kube-prometheus-stack bu etiketiyle kendi ServiceMonitor kaynaklarını seçer.
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: producer-metrics
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

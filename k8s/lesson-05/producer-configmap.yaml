@@ -5,6 +5,8 @@ metadata:
 data:
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   KAFKA_TOPIC: aircraft.positions.raw.v1
+  # Bu port yalnız cluster içindeki Prometheus tarafından taranır.
+  METRICS_PORT: "8000"
   POLL_INTERVAL_SECONDS: "120"
   MAX_POLLS: "0"
   OPENSKY_AREA_MODE: global

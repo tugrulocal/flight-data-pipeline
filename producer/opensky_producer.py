@@ -12,6 +12,14 @@ import requests
 from confluent_kafka import Producer
 
 from flight_common.logging import configure_json_logging
+from flight_common.producer_metrics import (
+    KAFKA_RECORDS_DELIVERED,
+    LAST_OPENSKY_SUCCESS_TIMESTAMP_SECONDS,
+    OPENSKY_REQUEST_DURATION_SECONDS,
+    OPENSKY_REQUESTS,
+    RATE_LIMIT_WAIT_SECONDS,
+    start_metrics_server,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +69,7 @@ class ProducerSettings:
     opensky_token_url: str
     opensky_client_id: str | None
     opensky_client_secret: str | None
+    metrics_port: int
 
     @property
     def has_credentials(self):
@@ -106,6 +115,9 @@ def load_settings(environ=None):
         ),
         opensky_client_id=client_id,
         opensky_client_secret=client_secret,
+        metrics_port=parse_int(
+            "METRICS_PORT", values.get("METRICS_PORT", "8000"), minimum=1
+        ),
     )
 
 
@@ -400,24 +412,43 @@ def run(settings, *, producer=None, opensky_client=None, stop_event=None):
             settings.max_polls == 0 or poll_number < settings.max_polls
         ):
             poll_number += 1
+            request_started_at = time.monotonic()
             try:
                 api_time, states = client.fetch_states()
-                send_states_to_kafka(
+                OPENSKY_REQUEST_DURATION_SECONDS.observe(
+                    time.monotonic() - request_started_at
+                )
+                OPENSKY_REQUESTS.labels(outcome="success").inc()
+                LAST_OPENSKY_SUCCESS_TIMESTAMP_SECONDS.set(time.time())
+
+                result = send_states_to_kafka(
                     kafka_producer, settings.kafka_topic, states, api_time
                 )
+                KAFKA_RECORDS_DELIVERED.inc(result["delivered"])
             except requests.HTTPError as error:
+                OPENSKY_REQUEST_DURATION_SECONDS.observe(
+                    time.monotonic() - request_started_at
+                )
                 if error.response is not None and error.response.status_code == 429:
                     retry_seconds = get_retry_seconds(error.response)
+                    OPENSKY_REQUESTS.labels(outcome="rate_limited").inc()
+                    RATE_LIMIT_WAIT_SECONDS.inc(retry_seconds)
                     logger.warning(
                         "OpenSky kredi limiti aşıldı.",
                         extra={"event": "rate_limited", "retry_seconds": retry_seconds},
                     )
                     stopping.wait(retry_seconds)
                     continue
+                OPENSKY_REQUESTS.labels(outcome="http_error").inc()
                 logger.error("OpenSky HTTP hatası.", extra={"event": "http_error", "error": str(error)})
             except requests.RequestException as error:
+                OPENSKY_REQUEST_DURATION_SECONDS.observe(
+                    time.monotonic() - request_started_at
+                )
+                OPENSKY_REQUESTS.labels(outcome="request_error").inc()
                 logger.error("OpenSky bağlantı hatası.", extra={"event": "request_error", "error": str(error)})
             except (ValueError, RuntimeError) as error:
+                OPENSKY_REQUESTS.labels(outcome="processing_error").inc()
                 logger.error("Producer işlem hatası.", extra={"event": "processing_error", "error": str(error)})
 
             if settings.max_polls == 0 or poll_number < settings.max_polls:
@@ -435,6 +466,7 @@ def main():
     configure_json_logging("producer")
     try:
         settings = load_settings()
+        start_metrics_server(settings.metrics_port)
         run(settings)
     except ValueError as error:
         logger.error("Producer ayarı geçersiz.", extra={"event": "configuration_error", "error": str(error)})
