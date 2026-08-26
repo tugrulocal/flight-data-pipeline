@@ -7,13 +7,14 @@ spec:
   template:
     metadata:
       labels:
-        # Tamamlanmış Job pod şablonu immutable'dır; release sürümüyle değişmez.
-        app.kubernetes.io/version: v1.0.0-rc.3
+        # Tamamlanmış Job pod şablonu immutable'dır; image release digest'iyle
+        # birlikte güncellenir.
+        app.kubernetes.io/version: v1.0.0-rc.5
     spec:
       restartPolicy: OnFailure
       containers:
         - name: topic-init
-          image: ghcr.io/tugrulocal/flight-data-pipeline-producer:v1.0.0-rc.3
+          image: ghcr.io/tugrulocal/flight-data-pipeline-producer@sha256:5fa81b27495a8dc812b3c04c09de89acb276c38c4bfc4fb8c09a8526a2fc0e19
           imagePullPolicy: IfNotPresent
           command:
             - python
