@@ -86,6 +86,8 @@ MapLibre varsayılandır. WebGL yoksa, harita kurulamazsa veya context kaybolurs
 - [Release ve offline dağıtım](docs/release.md)
 - [Release kabul matrisi](docs/release-acceptance.md)
 - [Local Prometheus ve Grafana izleme](docs/monitoring.md)
+- [Spark ders 01: yerel batch analiz](spark/README.md)
+- [Spark ders 02: local Apache Iceberg](spark/iceberg-README.md)
 - [Üçüncü taraf bildirimleri](THIRD_PARTY_NOTICES.md)
 - [Güvenlik politikası ve RC kapısı](SECURITY.md)
 

@@ -32,6 +32,14 @@ compose.yaml.bak
 .coverage
 *.tsbuildinfo
 
+# Spark laboratuvarının yerel ham girdileri ve üretilen analitik tabloları.
+# Bu dosyalar gerçek uçuş verisi içerir; kaynak koda eklenmez.
+spark/data/
+spark/output/
+spark/warehouse/
+spark/.ivy2/
+spark/reports/
+
 # Frontend bağımlılıkları ve build çıktısı
 node_modules/
 frontend/dist/
