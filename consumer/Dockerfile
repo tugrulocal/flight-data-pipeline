@@ -1,4 +1,4 @@
-FROM python:3.13.14-alpine3.23@sha256:9fdbf2e3e82628351513560b121e2ee6ce31cac212be9e070c5a5e2769fb5e76 AS wheel-builder
+FROM python:3.14.8-alpine3.23@sha256:e7cff362a12454395f8dc99607c21a602ea880cdce03538877b90c2ba932b16f AS wheel-builder
 
 WORKDIR /build
 
@@ -12,7 +12,7 @@ RUN apk add --no-cache gcc musl-dev librdkafka-dev=2.12.1-r0 \
         --no-build-isolation --require-hashes -r requirements.txt \
         --wheel-dir /wheels
 
-FROM python:3.13.14-alpine3.23@sha256:9fdbf2e3e82628351513560b121e2ee6ce31cac212be9e070c5a5e2769fb5e76
+FROM python:3.14.8-alpine3.23@sha256:e7cff362a12454395f8dc99607c21a602ea880cdce03538877b90c2ba932b16f
 
 ARG APP_VERSION=dev
 ARG VCS_REF=unknown
