@@ -1,9 +1,18 @@
 # Flight Data Pipeline — Codex Çalışma Rehberi
 
-Bu repository bir staj eğitim projesidir. Projenin iki eşit amacı vardır:
+Bu repository stajda geliştirilen bir uçuş veri hattını barındırır. Bu altyapı, İTÜ Bilgisayar Mühendisliği bitirme projesinin akademik araştırma katmanına temel oluşturur. Mevcut altyapının amaçları şunlardır.
 
 1. OpenSky uçuş verisini Kafka ve MongoDB üzerinden frontend'e taşıyan çalışan bir sistem kurmak.
 2. Kullanıcının Docker, Kafka, MongoDB, backend ve frontend kavramlarını uygulayarak öğrenmesini sağlamak.
+
+## Yeni oturum ve capstone çalışma kuralları
+
+- Her yeni oturumda bu dosyayı, [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [ROADMAP.md](ROADMAP.md) ve [PROGRESS.md](PROGRESS.md) dosyalarını oku. Görev öncesi Git durumunu ve kullanıcının verdiği kapsamı kontrol et.
+- Başlangıç referansı `main` üzerindeki `cf3b28e` commit'idir. Mevcut uçuş takibinin davranışını koru. Dokümantasyon, veri inceleme, veri toplama ve implementation için kullanıcının yetkilendirdiği kapsamı uygula. `capstone-development` dalını ancak açık onayla oluştur.
+- Göreve başlamadan önce Türkçe olarak ne yapacağını ve nedenini açıkla. Aşama sonunda değişiklikleri, testleri, gerçekleşen sonuçları, doğrulanmamış noktaları ve sonraki görevi [PROGRESS.md](PROGRESS.md) dosyasında kaydet. Teknik veya akademik bir karar alındığında durumunu, gerekçesini ve alternatiflerini [karar kaydına](docs/capstone/DECISIONS.md) ekle.
+- Şirkete ait kod veya verinin akademik kullanım, paylaşım ve yayın iznini varsayma. Kaynak, izin, veri kapsamı ve deney sonucu için doğrulanabilir kanıt kullan. Ham uçuş kayıtlarını, kişisel bilgileri ve secret değerlerini raporlara veya Git'e ekleme. Veri aktarımı ve canlı toplama için kullanıcı kapsamını doğrula.
+- Araştırma sorusunu hipotez olarak ele al. Karşılaştırılabilir baseline kullan. Train, validation ve test'i sequence üretiminden önce ayır. Dataset, split, model, seed ve çalışma ortamı sürümlerini kaydet. Başarısız deneyleri de [deney protokolüne](docs/capstone/EXPERIMENTS.md) göre kaydet.
+- Anomali tanımını ve ground truth kaynağını açıkça belgele. LLM açıklamalarını doğrulanabilir, yapılandırılmış backend ve model çıktılarına dayandır. Uygulamayı akademik araştırma prototipi olarak sun.
 
 ## En önemli çalışma kuralı
 
@@ -40,7 +49,9 @@ Kodları repository içinde doğrudan düzenle; kullanıcıdan uzun kodları kop
 - `kafka-local-backup`, `mongodb-local-backup` ve eski volume'lar kullanıcı açıkça istemedikçe silinmemeli.
 - Anlamlı bir aşama tamamlandığında değişiklikleri ve test sonuçlarını özetle; commit öner, ancak kullanıcı istemeden push yapma.
 
-## Hedef mimari
+## Uçuş takip uygulamasının mimarisi
+
+Araştırma katmanının hedefleri ve mevcut Spark batch hattı [Capstone Architecture](docs/capstone/ARCHITECTURE.md) belgesindedir.
 
 ```text
 OpenSky REST API
@@ -222,11 +233,13 @@ Yeni mesajlarda producer'ın bir kez ürettiği UUID `event_id`, legacy mesajlar
 - OpenStreetMap public tile servisi yalnızca local eğitim içindir. Production öncesinde kullanım politikası, destek ve erişilebilirlik gereksinimine uygun bir tile sağlayıcısı veya self-hosted çözüm seçilmelidir.
 - Geliştirme ortamındaki plaintext Kafka ve kimlik doğrulamasız MongoDB yalnızca local eğitim içindir.
 
-## Sıradaki işler
+## Release geçmişinden kalan operasyon maddeleri
+
+Güncel capstone sırası [ROADMAP.md](ROADMAP.md) ve [PROGRESS.md](PROGRESS.md) dosyalarındadır. Aşağıdaki release maddeleri önceki kabul planını aktarır. Phase 0'da yerelde `v1.0.0-rc.5` etiketi gözlendi ve bağımsız hedef kabulü yeniden doğrulanmadı. Release durumu için [kabul matrisine](docs/release-acceptance.md) ve [Phase 0 denetimine](docs/capstone/REPOSITORY_AUDIT.md) bak.
 
 1. `v1.0.0-rc.2` image ve offline paketleri yayımlandı ancak temiz Kafka volume izin hatası nedeniyle kabul edilmedi; bu etiket değiştirilmemelidir.
-2. `v1.0.0-rc.3` için `kafka-volume-init` ile temiz-volume offline/registry testini, GHCR manifest/SBOM/provenance/Cosign doğrulamasını ve `docs/release-acceptance.md` matrisini tamamla.
-3. Bütün kabul satırları geçerse `v1.0.0-rc.3` uygulama commit'i için kullanıcı onayıyla `v1.0.0` etiketi oluştur; kullanıcı istemeden tag/push yapma.
+2. Önceki `v1.0.0-rc.3` kabul planı `kafka-volume-init` ile temiz-volume offline/registry testini, GHCR manifest/SBOM/provenance/Cosign doğrulamasını ve `docs/release-acceptance.md` matrisini kapsıyordu.
+3. Bu planda `v1.0.0` etiketi için tüm kabul satırlarının geçmesi ve kullanıcı onayı şart koşulmuştu. Tag ve push işlemleri kullanıcı yetkisi gerektirir.
 
 ## Beklenen proje yapısı
 
