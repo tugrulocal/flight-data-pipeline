@@ -1,9 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+const MOCK_TILE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+  "base64",
+);
 
 test.beforeEach(async ({ page }) => {
   const now = new Date().toISOString();
+  // Testler public harita sunucularına istek göndermemeli.
+  for (const url of ["https://tile.openstreetmap.org/**", "https://basemaps.cartocdn.com/**"]) {
+    await page.route(url, (route) => route.fulfill({
+      contentType: "image/png",
+      body: MOCK_TILE,
+    }));
+  }
 
   await page.addInitScript(() => {
     class MockWebSocket extends EventTarget {
@@ -138,6 +149,33 @@ test.beforeEach(async ({ page }) => {
   }));
 });
 
+
+test("harita zemini hatası görünür olur ve uçuş verisi korunarak tekrar yüklenir", async ({ page }) => {
+  let failTiles = true;
+  let loadedTiles = 0;
+  // Gerçek harita sunucusuna yük bindirmeden bağlantı hatasını taklit et.
+  await page.route("https://tile.openstreetmap.org/**", async (route) => {
+    if (failTiles) {
+      await route.fulfill({ status: 503, body: "unavailable" });
+    } else {
+      loadedTiles += 1;
+      await route.fulfill({ contentType: "image/png", body: MOCK_TILE });
+    }
+  });
+  await page.goto("/");
+  await expect(page.getByText("Harita zemininin bazı parçaları alınamadı.")).toBeVisible();
+  await expect(page.getByText("Uyumluluk haritası aktif.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Operasyonlar" }).click();
+  await page.getByRole("listitem").filter({ hasText: "THY123" }).click();
+  await expect(page.getByText("2 nokta ile irtifa renkli rota")).toBeVisible();
+
+  failTiles = false;
+  await page.getByRole("button", { name: "Haritayı yeniden yükle" }).click();
+  await expect.poll(() => loadedTiles).toBeGreaterThan(0);
+  await expect(page.getByText("Harita zemininin bazı parçaları alınamadı.")).toHaveCount(0);
+  await expect(page.getByText("2 nokta ile irtifa renkli rota")).toBeVisible();
+  await expect(page.locator(".maplibregl-popup")).toBeVisible();
+});
 
 test("snapshot, arama, null ground state ve otomatik fallback", async ({ page }) => {
   await page.addInitScript(() => {

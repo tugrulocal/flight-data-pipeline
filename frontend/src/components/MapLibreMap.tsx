@@ -45,6 +45,7 @@ const MAPLIBRE_STYLES: Record<MapTheme, maplibregl.StyleSpecification> = {
         type: "raster",
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
         tileSize: 256,
+        maxzoom: 19,
         attribution: "© OpenStreetMap contributors",
       },
     },
@@ -53,6 +54,7 @@ const MAPLIBRE_STYLES: Record<MapTheme, maplibregl.StyleSpecification> = {
         id: "basemap",
         type: "raster",
         source: "basemap",
+        paint: { "raster-fade-duration": 0 },
       },
     ],
   },
@@ -63,6 +65,7 @@ const MAPLIBRE_STYLES: Record<MapTheme, maplibregl.StyleSpecification> = {
         type: "raster",
         tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
         tileSize: 256,
+        maxzoom: 20,
         attribution: "© OpenStreetMap contributors © CARTO",
       },
     },
@@ -71,6 +74,7 @@ const MAPLIBRE_STYLES: Record<MapTheme, maplibregl.StyleSpecification> = {
         id: "basemap",
         type: "raster",
         source: "basemap",
+        paint: { "raster-fade-duration": 0 },
       },
     ],
   },
@@ -401,6 +405,7 @@ export function MapLibreMap({
   const [projectionMode, setProjectionMode] =
     useState<"mercator" | "globe">("mercator");
   const [styleRevision, setStyleRevision] = useState(0);
+  const [basemapError, setBasemapError] = useState(false);
 
   // onSelectAircraft referansını güncel tut (closure tuzağı önlenir)
   useEffect(() => {
@@ -489,6 +494,8 @@ export function MapLibreMap({
         zoom: MERCATOR_ZOOM,
         minZoom: 1,
         maxZoom: 18,
+        // Yeni detaylar gelirken önceki zoom seviyesinin zemini korunur.
+        cancelPendingTileRequestsWhileZooming: false,
       });
     } catch (error) {
       onMapErrorRef.current(
@@ -514,7 +521,11 @@ export function MapLibreMap({
       failureReported = true;
       onMapErrorRef.current(error);
     };
-    const handleMapError = (event: { error?: Error }) => {
+    const handleMapError = (event: { error?: Error; sourceId?: string }) => {
+      if (event.sourceId === "basemap") {
+        setBasemapError(true);
+        return;
+      }
       // Stil kurulduktan sonraki tekil raster tile hataları haritanın
       // tamamının bozulduğu anlamına gelmez. İlk stil kurulumu başarısızsa
       // Leaflet fallback devreye girer.
@@ -532,6 +543,7 @@ export function MapLibreMap({
     canvas.addEventListener("webglcontextlost", handleContextLost);
 
     map.on("style.load", () => {
+      setBasemapError(false);
       setStyleRevision((revision) => revision + 1);
       /* Her irtifa rengi için ayrı bir Canvas ikonu ekle */
       for (const item of ALTITUDE_LEGEND) {
@@ -927,6 +939,24 @@ export function MapLibreMap({
       data-feature-count={aircraftGeoJson.features.length}
     >
       <div ref={containerRef} className="maplibre-map" />
+
+      {basemapError && (
+        <aside className="map-fallback-notice" role="status">
+          <span>Harita zemininin bazı parçaları alınamadı.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setBasemapError(false);
+              styleReadyRef.current = false;
+              mapRef.current?.setStyle(MAPLIBRE_STYLES[currentThemeRef.current], {
+                diff: false,
+              });
+            }}
+          >
+            Haritayı yeniden yükle
+          </button>
+        </aside>
+      )}
 
       {/* Projection toggle */}
       <div

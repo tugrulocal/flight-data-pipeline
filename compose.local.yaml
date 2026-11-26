@@ -1,0 +1,9 @@
+# Yalnız yerel frontend düzeltmesini çalıştırır; release image etiketleri korunur.
+# docker compose -f compose.yaml -f compose.local.yaml up -d --build --no-deps frontend
+services:
+  frontend:
+    image: flight-data-pipeline-frontend:map-fix-local
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile

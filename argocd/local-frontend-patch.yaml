@@ -1,0 +1,7 @@
+# Yalnız bu bilgisayarda üretilen frontend image'ını seçer; registry'ye push gerekmez.
+# kubectl patch application flight-data-pipeline -n argocd --type=merge --patch-file argocd/local-frontend-patch.yaml
+spec:
+  source:
+    kustomize:
+      images:
+        - ghcr.io/tugrulocal/flight-data-pipeline-frontend=flight-data-pipeline-frontend:map-fix-local

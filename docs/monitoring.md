@@ -53,6 +53,24 @@ curl -I http://grafana.flight.test/
 
 Grafana: http://grafana.flight.test/
 
+### Dashboard `No data` gösteriyorsa
+
+Önce sağ üstteki zaman aralığını kontrol et. Docker Desktop kapalıyken
+Prometheus yeni metrik toplayamaz; uygulama yeniden açılsa bile geçmişte kalan
+sabit bir saat aralığı `No data` göstermeye devam edebilir. `Last 15 minutes`
+seçip `Refresh` düğmesine bas. Güncel aralığı doğrudan açmak için:
+
+http://grafana.flight.test/d/flight-pipeline-overview/flight-pipeline-overview?from=now-15m&to=now&refresh=30s
+
+`refresh=30s` sorguları yeniler; sabit seçilmiş bir zaman aralığını bugüne taşımaz.
+Yeni başlangıçta 5 dakikalık hız panelleri için birkaç metrik örneğinin
+toplanması gerekir. Argo CD `Healthy`, kaynakların hazır olduğunu gösterir;
+seçilen zaman aralığında metrik bulunduğunu garanti etmez.
+
+Güncel aralıkta da veri yoksa Grafana Explore üzerinden `up` sorgusunu çalıştır.
+Hedef için `1` erişilebilir, `0` metrik toplama hatası anlamına gelir; sonuç
+bulunmaması veri kaynağının ve ServiceMonitor keşfinin incelenmesini gerektirir.
+
 Prometheus ve Alertmanager bu aşamada Ingress ile dışarı açılmaz. Prometheus
 gerektiğinde yalnız local port-forward ile incelenir:
 

@@ -14,6 +14,35 @@ Normal uygulama logları tek satırlık JSON'dur: UTC zaman, seviye, servis, ola
 
 Yanıt sürüm, MongoDB/Kafka durumu, işlenen/atlanan mesaj ve batch sayaçları ile veri tazeliğini içerir. Veri eskiliği bilgi amaçlıdır; tek başına container'ı unhealthy yapmaz.
 
+## Harita zemini eksik yükleniyorsa
+
+Uçaklar backend'den, zemin parçaları tarayıcıdan doğrudan harita sağlayıcısından
+gelir. Uçaklar güncellenirken zeminde boşluk oluşması Kafka veya MongoDB'nin
+durduğunu göstermez. Tarayıcının Network panelinde `tile.openstreetmap.org`
+isteklerini incele: başarısız/uzun bekleyen istek ile başarılı indirilip ekrana
+çizilmeyen parçayı ayır. Başarısız isteklerde haritadaki yeniden yükleme
+düğmesini kullan; bu işlem seçili uçağı, rotayı ve kamera konumunu korur.
+Zoom sırasında önceki seviyenin bekleyen parçaları iptal edilmez ve raster
+saydamlık geçişi kapalıdır; yeni ayrıntılar gelene kadar eski zemin kullanılabilir.
+
+Yerel frontend düzeltmesini release etiketlerine dokunmadan çalıştırmak için:
+
+    docker compose -f compose.yaml -f compose.local.yaml up -d --build --no-deps frontend
+
+`--build` kaynak koddan yerel image üretir; `--no-deps` diğer servisleri yeniden
+başlatmaz. Normal release frontend'ine dönüş: `docker compose up -d --no-deps frontend`.
+
+Bu bilgisayardaki Docker Desktop Kubernetes kurulumu yerel image'ı da kullanabilir:
+
+    kubectl patch application flight-data-pipeline -n argocd --type=merge --patch-file argocd/local-frontend-patch.yaml
+
+Bu, Argo CD'nin yerel image seçimini açık bir Kustomize override olarak izlemesini
+sağlar. Image yalnız bu Docker host'unda bulunur; başka cluster için release
+üretmek gerekir. Kaynak kod değişikliği henüz release değildir. Önceki Git'teki
+image seçimine dönmek için aşağıdaki komuttan sonra Argo CD'de Sync çalıştır:
+
+    kubectl patch application flight-data-pipeline -n argocd --type=merge -p '{"spec":{"source":{"kustomize":null}}}'
+
 ## Kafka topic ve lag
 
     docker compose run --rm --no-deps topic-init topics
